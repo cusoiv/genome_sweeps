@@ -1,0 +1,72 @@
+Wed Sep 23 18:25:00 CEST 2020
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+1: PREPARING DATA
+2,3: RUNNING mummer AND CREATING CLUSTERS
+# reading input file "/tmp/cl_1/align/clonal_group.GUT_GENOME000008.ntref" of length 3236133
+# construct suffix tree for sequence of length 3236133
+# (maximum input length is 2305843009213693948)
+# process 32361 characters per dot
+#....................................................................................................
+# CONSTRUCTIONTIME /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.GUT_GENOME000008.ntref 1.55
+# reading input file "/tmp/cl_1/align/clonal_group.GUT_GENOME000008.queries.fsa" of length 10786830
+# matching query-file "/tmp/cl_1/align/clonal_group.GUT_GENOME000008.queries.fsa"
+# against subject-file "/tmp/cl_1/align/clonal_group.GUT_GENOME000008.ntref"
+# COMPLETETIME /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.GUT_GENOME000008.ntref 14.19
+# SPACE /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.GUT_GENOME000008.ntref 13.44
+4: FINISHING DATA
+Wed Sep 23 18:25:24 CEST 2020
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+1: PREPARING DATA
+2,3: RUNNING mummer AND CREATING CLUSTERS
+# reading input file "/tmp/cl_1/align/clonal_group.GMC_8306RM_0517_020_B7_final.ntref" of length 3628041
+# construct suffix tree for sequence of length 3628041
+# (maximum input length is 2305843009213693948)
+# process 36280 characters per dot
+#....................................................................................................
+# CONSTRUCTIONTIME /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.GMC_8306RM_0517_020_B7_final.ntref 1.98
+# reading input file "/tmp/cl_1/align/clonal_group.GMC_8306RM_0517_020_B7_final.queries.fsa" of length 7158789
+# matching query-file "/tmp/cl_1/align/clonal_group.GMC_8306RM_0517_020_B7_final.queries.fsa"
+# against subject-file "/tmp/cl_1/align/clonal_group.GMC_8306RM_0517_020_B7_final.ntref"
+# COMPLETETIME /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.GMC_8306RM_0517_020_B7_final.ntref 9.37
+# SPACE /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.GMC_8306RM_0517_020_B7_final.ntref 10.35
+4: FINISHING DATA
+Wed Sep 23 18:25:41 CEST 2020
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+1: PREPARING DATA
+2,3: RUNNING mummer AND CREATING CLUSTERS
+# reading input file "/tmp/cl_1/align/clonal_group.aa_0143_0055_f1_final.ntref" of length 3359978
+# construct suffix tree for sequence of length 3359978
+# (maximum input length is 2305843009213693948)
+# process 33599 characters per dot
+#....................................................................................................
+# CONSTRUCTIONTIME /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.aa_0143_0055_f1_final.ntref 1.54
+# reading input file "/tmp/cl_1/align/clonal_group.aa_0143_0055_f1_final.queries.fsa" of length 3798811
+# matching query-file "/tmp/cl_1/align/clonal_group.aa_0143_0055_f1_final.queries.fsa"
+# against subject-file "/tmp/cl_1/align/clonal_group.aa_0143_0055_f1_final.ntref"
+# COMPLETETIME /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.aa_0143_0055_f1_final.ntref 5.64
+# SPACE /scratch/xy43/miniconda/envs/popcogent_test/bin//MUMmer3.20/mummer /tmp/cl_1/align/clonal_group.aa_0143_0055_f1_final.ntref 6.88
+4: FINISHING DATA
+Wed Sep 23 18:25:50 CEST 2020
+CMD:cat /tmp/cl_1/align//aa_0143_0055_f1_final | perl -ne 'if(/^\>([^\s\:]+)\:([^\s\:]+)/){if($1 ne $2){ print ">$1.$2 $1\n";} elsif(defined $1 && defined $2){print ">$1.$2\n";}else {print ">$1\n";}}else{die if(/\>/);print $_}' >> /tmp/cl_1/align/clonal_group.all.fsa
+CMD:cat /tmp/cl_1/align//GUT_GENOME000590 | perl -ne 'if(/^\>([^\s\:]+)\:([^\s\:]+)/){if($1 ne $2){ print ">$1.$2 $1\n";} elsif(defined $1 && defined $2){print ">$1.$2\n";}else {print ">$1\n";}}else{die if(/\>/);print $_}' >> /tmp/cl_1/align/clonal_group.all.fsa
+CMD:cat /tmp/cl_1/align//GUT_GENOME000008 | perl -ne 'if(/^\>([^\s\:]+)\:([^\s\:]+)/){if($1 ne $2){ print ">$1.$2 $1\n";} elsif(defined $1 && defined $2){print ">$1.$2\n";}else {print ">$1\n";}}else{die if(/\>/);print $_}' >> /tmp/cl_1/align/clonal_group.all.fsa
+CMD:cat /tmp/cl_1/align//GMC_8306RM_0517_020_B7_final | perl -ne 'if(/^\>([^\s\:]+)\:([^\s\:]+)/){if($1 ne $2){ print ">$1.$2 $1\n";} elsif(defined $1 && defined $2){print ">$1.$2\n";}else {print ">$1\n";}}else{die if(/\>/);print $_}' >> /tmp/cl_1/align/clonal_group.all.fsa
+CMD:/scratch/xy43/miniconda/envs/popcogent_test/bin//mugsyWGA --outfile /tmp/cl_1/align/clonal_group --seq /tmp/cl_1/align/clonal_group.all.fsa --aln /tmp/cl_1/align/clonal_group.xmfa --distance 1000 --minlength 30  --unique true  > /tmp/cl_1/align/clonal_group.mugsywga.out 2> /tmp/cl_1/align/clonal_group.mugsywga.stderr

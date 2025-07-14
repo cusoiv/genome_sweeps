@@ -1,0 +1,23 @@
+project_dir = .project_dir/
+input_contig_dir = .project_dir/genomes/
+contig_dir = .project_dir/genomes/
+input_contig_extension = .fna
+
+pop_infile_name = .pop_infile_name #needs to be relative path to project_dir
+output_prefix = .basename
+focus_population = .focus_population
+
+ref_iso = .ref_iso
+ref_contig = .ref_contig #note that dash '-' characters are converted to underscore '_' characters by mugsy, also needs to be >3000bp?
+
+len_block_threshold = 1000 #minimum length of a degapped alignment block 
+gap_prop_thresh = 0.5 #maximum proportion of alignment block that can be '-'
+total_jobs = .total_jobs #number of jobs to submit for tree building
+window_size = 100 #number of SNPs to include per tree
+window_overlap = 1 #number of SNPs to overlap between windows - larger overlaps will decrease the number of trees generated
+percentile_threshold = 5 #within population diversity percentile cutoff, 5% recommended
+min_physplit_window_size = 10 #minimum number of SNPs in a row that satisfy the monophyly and percentile threshold to warrant creating a new range to output
+
+MUGSY_source = source /lisc/scratch/dome/xy43/miniconda/envs/popcogent_test/bin/mugsyenv.sh #location of source file for MUGSY alignment tool
+phyML_loc = phyml #location of PhyML
+phyML_properties = -q -m JC69 -f e -c 2 -a 0.022 #-m JC69 -f e -c $Ncat -a $alpha
