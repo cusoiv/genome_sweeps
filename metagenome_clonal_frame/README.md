@@ -5,3 +5,5 @@
 02_db_analysis_r2.R applies the 5X rule towards the results to find metagenome-isolate based sweeps
 
 03_run_instrain_cf_compare.sh confirms all the metagenome-isolate sweeps with pairwise distances 
+
+04_db_analysis_part2.Rmd is the figure generating file for Figure 1, and Extended Figures 4 and 5.
