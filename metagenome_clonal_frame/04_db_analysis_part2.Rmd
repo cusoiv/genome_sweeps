@@ -1,0 +1,888 @@
+---
+title: "db_analysis_part2_cleaned"
+author: "Xiaoqian Yu"
+date: "2023-11-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr:: opts_knit$set(root.dir = "C:/Users/Xiaoqian/Desktop/pop_gen/UHGG_plus4/instrain/")
+```
+
+```{r import libraries,warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(data.table)
+library(pegas)
+library(ape)
+library(castor)
+library(phangorn)
+library(ggtree)
+library(ggnewscale)
+library(ggpubr)
+library(tidyr)
+library(RColorBrewer)
+library(ggpomological)
+library(viridis)
+library(ggtreeExtra)
+library(wesanderson)
+```
+
+
+```{r load data}
+all_sweep_info_total_list_sweep_list=readRDS("all_sweep_info_total_list_sweep_list.rds")
+new_sis_sweep_gene_info_list=readRDS("new_sis_sweep_gene_info_list.rds")
+new_sweep_SNV_consensus_tajima_list=readRDS("new_sweep_SNV_consensus_tajima_list.rds")
+```
+
+
+```{r check for sweeps that actually are overlapping sweeps}
+
+all_sweep_info_total_list_sweep_new=bind_rows(all_sweep_info_total_list_sweep_list)
+
+all_sweep_info_total_list_sweep_SGB=split(all_sweep_info_total_list_sweep_new,
+                                               f=all_sweep_info_total_list_sweep_new$SGB)
+
+all_sweep_info_total_list_sweep_SGB=lapply(all_sweep_info_total_list_sweep_SGB,function(x) x%>% filter(group!='no_sweep'))
+
+calc_overlap=function(x){
+  x=x %>% filter(group=='new_sweep')
+  x_count=x %>% group_by(sample) %>% summarise(n=n())
+  l=split(x,x$scaffold)
+  l_fold=list()
+  for (c in 1:length(l)){
+    ll=l[[c]]
+    l_count=x_count %>% filter(sample %in% ll$sample)
+    l_fold[[c]]=sum(l_count$n)/nrow(l_count)
+  }
+  l_fold
+} 
+
+all_sweep_info_total_list_sweep_SGB=Filter(function(df) nrow(df) > 0, all_sweep_info_total_list_sweep_SGB)
+all_sweep_info_total_list_sweep_SGB_overlap=lapply(all_sweep_info_total_list_sweep_SGB,
+                                                   function(x) calc_overlap(x))
+
+```
+
+#problems with some of the "overlaps"
+#SGB17256 This one metagenome M2.11.ST seems to map to everything with really low divergence
+#The same metagenome messes up SGB1871
+
+
+```{r add taxa and classfication}
+taxa_list=read.table("../fastANI_clust.average.diffH.94s.fgspecies.txt",
+                     sep='\t',header=T)
+taxa_list_summary=taxa_list %>% group_by(cluster) %>% count(fgspecies) %>% slice(which.max(n))
+taxa_list_summary$species=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',3)
+taxa_list_summary$genus=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',2)
+taxa_list_summary=taxa_list_summary %>% mutate(taxa = case_when(species=='s__' ~ paste0(genus,'_',species),
+                                                                TRUE ~ paste0(species)))
+taxa_list_summary$cluster_taxa=paste(taxa_list_summary$taxa,taxa_list_summary$cluster,sep = "_")
+
+
+all_sweep_info_total_list_sweep_new=bind_rows(all_sweep_info_total_list_sweep_list)
+new_sis_sweep_gene_info_total=bind_rows(new_sis_sweep_gene_info_list)
+new_sweep_SNV_consensus_tajima_total=bind_rows(new_sweep_SNV_consensus_tajima_list)
+#new_sweep_SNV_consensus_tajima_total=apply(new_sweep_SNV_consensus_tajima_total,2,function(x) {is.na(x)=NA;x})
+new_sis_sweep_gene_pos_total=new_sis_sweep_gene_info_total %>% group_by(scaffold) %>% summarise(n=n())
+
+
+all_sweep_info_total_list_new=split(all_sweep_info_total_list_sweep_new,
+                                    f=all_sweep_info_total_list_sweep_new$SGB)
+
+all_sweep_info_total_list_sweep_new$scaffold=gsub('_consensus','',
+                                                  all_sweep_info_total_list_sweep_new$scaffold)
+
+all_sweep_info_total_list_sweep_new=merge(all_sweep_info_total_list_sweep_new,
+                                          taxa_list_summary,by.x='SGB', 
+                                          by.y = 'cluster')
+SGB_class=read.csv('../SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
+all_sweep_info_total_list_sweep_new=all_sweep_info_total_list_sweep_new %>% 
+  mutate(class=case_when(cluster_taxa %in% SGB_class$pathogen ~ 'pathogens',
+                         cluster_taxa %in% SGB_class$probiotics ~ 'probiotics',
+                         TRUE ~ 'commensals'))
+all_sweep_info_total_list_sweep_new$taxa=paste0(all_sweep_info_total_list_sweep_new$taxa,
+                                                "_",all_sweep_info_total_list_sweep_new$scaffold)
+all_sweep_info_total_list_sweep_new$family=sapply(strsplit(all_sweep_info_total_list_sweep_new$fgspecies,split = ';'),'[[',1)
+metadata_isolate=read.csv('../UHGG_plus4_metadata.csv') %>% select(Strain,Country)
+metadata_MG=read.csv('../metagenome_strainphlan_metadata_s2000.csv') %>% select(sample_id,country)
+names(metadata_MG)=c("Strain","Country")
+metadata_all=rbind(metadata_isolate,metadata_MG)
+all_sweep_info_total_list_sweep_new=merge(all_sweep_info_total_list_sweep_new,metadata_all,by.x="sample",by.y="Strain")
+all_sweep_info_total_list_sweep_new=left_join(all_sweep_info_total_list_sweep_new,new_sis_sweep_gene_pos_total,by='scaffold')
+all_sweep_info_total_list_sweep_new=left_join(all_sweep_info_total_list_sweep_new,new_sweep_SNV_consensus_tajima_total,by='scaffold')
+
+all_sweep_info_total_list_sweep_new$n[all_sweep_info_total_list_sweep_new$group=='new_sweep']=NA
+all_sweep_info_total_list_sweep_new$n.y[all_sweep_info_total_list_sweep_new$group=='new_sweep']=NA
+
+
+```
+
+
+```{r re-filter all pairs with pairwise confirmations}
+
+compare_summary_5s=read.csv('confirmed_sweep_from_pairwise.csv')
+compare_summary_5s$SGB=NULL
+
+compare_summary_5s$scaffold=gsub('_consensus','',compare_summary_5s$scaffold)
+all_sweep_info_total_list_sweep_new=inner_join(all_sweep_info_total_list_sweep_new,
+                                               compare_summary_5s,by='scaffold')
+all_countries=as.data.frame(unique(all_sweep_info_total_list_sweep_new$Country))
+names(all_countries)='Country'
+
+
+```
+
+
+```{r get extra continent column}
+
+country_to_continent=read.csv('../country_to_continent.csv',header = T)
+all_sweep_info_total_list_sweep_new=left_join(all_sweep_info_total_list_sweep_new,country_to_continent,by='Country')
+all_sweep_info_total_list_sweep_new$taxa=gsub('diffH','',all_sweep_info_total_list_sweep_new$taxa)
+all_sweep_info_total_list_sweep_new$Continent[is.na(all_sweep_info_total_list_sweep_new$Continent)]='Unknown'
+all_sweep_info_total_list_sweep_new$Continent_2[is.na(all_sweep_info_total_list_sweep_new$Continent_2)]='Unknown'
+all_sweep_info_total_list_sweep_new_fc=all_sweep_info_total_list_sweep_new %>% filter(group!='no_sweep') %>% filter(class=='commensals')
+all_sweep_info_total_list_sweep_new_fpath=all_sweep_info_total_list_sweep_new %>% filter(group!='no_sweep') %>% filter(class=='pathogens')
+all_sweep_info_total_list_sweep_new_fpro=all_sweep_info_total_list_sweep_new %>% filter(group!='no_sweep') %>% filter(class=='probiotics')
+all_sweep_info_total_list_sweep_new_ns=all_sweep_info_total_list_sweep_new %>% filter(group=='no_sweep')
+all_sweep_info_total_list_sweep_new_s=all_sweep_info_total_list_sweep_new %>% filter(group!='no_sweep')
+all_sweep_info_total_list_sweep_new_fc_select=all_sweep_info_total_list_sweep_new_fc
+
+all_sweep_info_total_list_sweep_new_ss=all_sweep_info_total_list_sweep_new_s %>% filter(group=='new_sweep')
+
+
+all_sweep_info_total_list_sweep_new_ss_count= all_sweep_info_total_list_sweep_new_ss %>%
+  group_by(SGB,class) %>% summarise(n=n_distinct(scaffold))
+
+all_sweep_info_total_list_sweep_new_fc_scaffold_list=unique(all_sweep_info_total_list_sweep_new_fc$scaffold)
+all_sweep_info_total_list_sweep_new_fpath_scaffold_list=unique(all_sweep_info_total_list_sweep_new_fpath$scaffold)
+all_sweep_info_total_list_sweep_new_fpro_scaffold_list=unique(all_sweep_info_total_list_sweep_new_fpro$scaffold)
+
+#write.csv(all_sweep_info_total_list_sweep_new_fc_scaffold_list,'confimed_sweep_from_pairwise_commensal.csv',row.names = F,col.names = F)
+
+
+
+```
+
+```{r, write out sweep classifications}
+
+#write.csv(data.frame(commensals=unique(all_sweep_info_total_list_sweep_new_fc$cluster_taxa)),'taxa_class_commensal.csv',row.names = F)
+#write.csv(data.frame(pathogens=unique(all_sweep_info_total_list_sweep_new_fpath$cluster_taxa)),'taxa_class_pathogens.csv',row.names = F)
+#write.csv(data.frame(probiotics=unique(all_sweep_info_total_list_sweep_new_fpro$cluster_taxa)),'taxa_class_probiotics.csv',row.names = F)
+
+
+```
+
+
+```{r tree plotting}
+#load tree for all clonal frames
+ct=read_tree(file='gtdbtk.unrooted.itol.tree')
+ct$tip.label=gsub('_cf_consensus','',ct$tip.label)
+
+##all plot panels for commensals
+#tree
+cts=keep.tip(ct,all_sweep_info_total_list_sweep_new_fc$scaffold)
+cts=midpoint(cts)
+all_sweep_info_total_list_sweep_new_uniq=all_sweep_info_total_list_sweep_new %>% 
+  select(scaffold,taxa) %>% distinct()
+newtip=inner_join(data.frame(tip.label=cts$tip.label),all_sweep_info_total_list_sweep_new_uniq,by=c('tip.label'='scaffold'))
+cts$tip.label=newtip$taxa
+ct_tipseq=get_taxa_name(ggtree(cts))
+
+#select and edit data frame
+sweep_df=all_sweep_info_total_list_sweep_new_fc %>% select(taxa,dist,ratio,group,type,class,scaffold,bd,family,Country,Continent,Continent_2,SGB) 
+sweep_df$taxa=as.factor(sweep_df$taxa)
+sweep_df$taxa=factor(sweep_df$taxa, levels = ct_tipseq)
+sweep_df$Continent=as.factor(sweep_df$Continent)
+
+sweep_df$dist[sweep_df$dist>0.1]=0.1
+sweep_df$dist[sweep_df$dist<10^-6]=10^-6
+sweep_df=sweep_df %>% group_by(taxa) %>% 
+  mutate(dist2=case_when(group=='new_sis_sweep' & dist==max(dist) ~ 0.05,
+                         group=='new_sweep' & dist==min(dist) ~ 10^-6,
+                         TRUE ~ dist))
+sweep_df=sweep_df %>% ungroup() %>% mutate(type2=case_when(type %in% c('sweep','sis_sweep') ~ 'isolate', 
+                                             TRUE ~ 'MG')) 
+sweep_df_family=sweep_df %>% select(taxa,family) %>% distinct()
+
+#try coloring the tree by family
+families_list=split(sweep_df_family,f=sweep_df_family$family)
+families_list=lapply(families_list,function(x) x$taxa)
+colourCount = length(unique(sweep_df_family$family))
+getPalette = colorRampPalette(brewer.pal(8, "Dark2"))
+
+
+cts=groupOTU(cts,families_list)
+p=ggtree(cts,aes(color=group),layout = 'fan',open.angle = 30)+
+  scale_color_manual(values = c("#000000",getPalette(colourCount)),guide = FALSE)
+sweep_df_family$taxa=as.character(sweep_df_family$taxa)
+sweep_df_family$family=gsub('f__','',sweep_df_family$family)
+#p=rotate_tree(p, -90)
+
+p=p %<+% sweep_df_family +
+  new_scale_colour()+
+  geom_tippoint(aes(color=family),size=0.01)+
+#  geom_tiplab(aes(label=family,color=family),size=2)+
+  scale_color_manual(values = c(getPalette(colourCount),"#000000"))+
+  guides(color = guide_legend(override.aes = list(size=5,shape=15)))+
+  geom_treescale(x=0.3,y=42.5,width=0.1,offset = -1)
+
+#png(paste0('sweep_summary/','tree_with_family_name.png'),width=3600,height=2400,res=300)
+#print(p)
+#dev.off()
+
+```
+
+```{r}
+all_sweep_info_total_list_sweep_new_dist=all_sweep_info_total_list_sweep_new %>%
+  filter(group=='new_sweep') %>% group_by(scaffold,class,family,genus,species) %>%  summarise(max_dist=mean(max_dist),max_SNP=mean(max_SNP),nc=n(),mean_dist=mean(mean_dist),mean_SNP=mean(mean_SNP)) #I can do this because how i previously merged, all mean_dist in a scaffold is the same 
+
+all_sweep_info_total_list_sweep_new_dist=left_join(all_sweep_info_total_list_sweep_new_dist,new_sis_sweep_gene_pos_total,by='scaffold')
+ all_sweep_info_total_list_sweep_new_dist=left_join(all_sweep_info_total_list_sweep_new_dist,new_sweep_SNV_consensus_tajima_total,by='scaffold')
+
+
+all_sweep_info_total_list_sweep_new_dist_1=all_sweep_info_total_list_sweep_new_dist %>% filter(class=='commensals')
+all_sweep_info_total_list_sweep_new_dist_2=all_sweep_info_total_list_sweep_new_dist %>% filter(class=='pathogens')
+all_sweep_info_total_list_sweep_new_dist_3=all_sweep_info_total_list_sweep_new_dist %>% filter(class=='probiotics')
+
+#pathogens
+t.test(log10(all_sweep_info_total_list_sweep_new_dist_1$mean_SNP),log10(all_sweep_info_total_list_sweep_new_dist_2$mean_SNP))
+#probiotics
+t.test(log10(all_sweep_info_total_list_sweep_new_dist_1$mean_SNP),log10(all_sweep_info_total_list_sweep_new_dist_3$mean_SNP))
+
+
+#cor.test(all_sweep_info_total_list_sweep_new_dist_1$max_SNP,all_sweep_info_total_list_sweep_new_dist_1$n,method = 'spearman')
+# all_sweep_info_total_list_sweep_new_dist_1s=all_sweep_info_total_list_sweep_new_dist_1 %>% filter(!is.na(D))
+# cor.test(all_sweep_info_total_list_sweep_new_dist_1s$max_SNP,all_sweep_info_total_list_sweep_new_dist_1s$D,method = 'spearman')
+
+ph=ggplot(data=all_sweep_info_total_list_sweep_new_dist,aes(x=mean_dist,fill=class))+
+  geom_histogram(alpha=0.6, binwidth = 0.2,just=0.5) +
+  facet_wrap(~class,nrow=3)+scale_x_log10()+
+  
+  scale_fill_manual(values = c('lightblue4','#661100','lightsalmon3')) +
+  scale_color_manual(values = c('lightblue4','#661100','lightsalmon3')) +
+  theme_bw()+
+  theme(
+    legend.position="none",
+    panel.spacing = unit(0.1, "lines"),
+    strip.text.x = element_text(size = 18),
+    axis.title = element_text(size = 18),  # Font size for axis titles
+    axis.text = element_text(size = 16),  # Font size for axis labels
+    legend.text = element_text(size = 18),  # Font size for legend labels
+    legend.title = element_text(size = 20) 
+  ) +
+  ylab("Number of sweeps")+
+  xlab('Average pairwise distance in sweep')
+
+all_sweep_info_total_list_sweep_new_dist_mean=all_sweep_info_total_list_sweep_new_dist %>%
+  group_by(class) %>%
+  summarise(mean_mean_dist=mean(mean_dist),mean_mean_SNP=mean(mean_SNP))
+
+
+all_sweep_info_total_list_sweep_new_dist_2= all_sweep_info_total_list_sweep_new_dist %>%
+  filter(class!='probiotics')
+ph2=ggplot(data=all_sweep_info_total_list_sweep_new_dist_2,aes(x=mean_dist,fill=class))+
+  geom_histogram(alpha=0.6, binwidth = 0.2,just=0.5) +
+  facet_wrap(~class,nrow=2)+scale_x_log10()+
+  scale_fill_manual(values = c('lightblue4','thistle')) +
+  scale_color_manual(values = c('lightblue4','thistle'))+
+  theme_bw()+
+  theme(
+    legend.position="none",
+    panel.spacing = unit(0.1, "lines"),
+    strip.text.x = element_text(size = 18),
+    axis.title = element_text(size = 18),  # Font size for axis titles
+    axis.text = element_text(size = 16),  # Font size for axis labels
+    legend.text = element_text(size = 18),  # Font size for legend labels
+    legend.title = element_text(size = 20) 
+  ) +
+  ylab("Number of sweeps")+
+  xlab('Average pairwise distance in sweep')
+
+
+
+#png('sweep_summary/sweep_count_by_distance_with_MG.png', res=300, width = 2000,height = 2000)
+ph
+#dev.off()
+
+#png('sweep_summary/sweep_count_by_distance_with_MG_2.png', res=300, width = 2000,height = 2000)
+ph2
+#dev.off()
+
+p2=ggplot(data=all_sweep_info_total_list_sweep_new_dist,aes(x=mean_SNP,fill=class))+
+  geom_histogram(alpha=0.6,just=0.5) +
+  geom_vline(data=all_sweep_info_total_list_sweep_new_dist_mean, aes(xintercept=mean_mean_SNP, color=class),
+             linetype="dashed")+
+  facet_wrap(~class,nrow=3)+scale_x_log10()+
+  scale_fill_manual(values = c('lightblue4','#661100','lightsalmon3')) +
+  scale_color_manual(values = c('lightblue4','#661100','lightsalmon3')) +
+  theme_bw()+
+  theme(
+    legend.position="none",
+    panel.spacing = unit(0.1, "lines"),
+    strip.text.x = element_text(size = 18),
+    axis.title = element_text(size = 18),  # Font size for axis titles
+    axis.text = element_text(size = 16),  # Font size for axis labels
+    legend.text = element_text(size = 18),  # Font size for legend labels
+    legend.title = element_text(size = 20) 
+  ) +
+  ylab("Number of GWSSs")+
+  xlab('Average pairwise SNP in GWSS cluster')
+
+png('sweep_summary/sweep_count_by_SNP_with_MG.png', res=300, width = 2000,height = 2000)
+p2
+dev.off()
+
+p2_2=ggplot(data=all_sweep_info_total_list_sweep_new_dist_2,aes(x=mean_SNP,fill=class))+
+  geom_histogram(alpha=0.6,just=0.5) +
+  facet_wrap(~class,nrow=2)+scale_x_log10()+
+  scale_fill_manual(values = c('lightblue4','thistle')) +
+  scale_color_manual(values = c('lightblue4','thistle'))+
+  theme_bw()+
+  theme(
+    legend.position="none",
+    panel.spacing = unit(0.1, "lines"),
+    strip.text.x = element_text(size = 18),
+    axis.title = element_text(size = 18),  # Font size for axis titles
+    axis.text = element_text(size = 16),  # Font size for axis labels
+    legend.text = element_text(size = 18),  # Font size for legend labels
+    legend.title = element_text(size = 20) 
+  ) +
+  ylab("Number of sweeps")+
+  xlab('Average pairwise SNP in sweep')
+
+#png('sweep_summary/sweep_count_by_SNP_with_MG_2.png', res=300, width = 2000,height = 2000)
+p2_2
+#dev.off()
+
+
+```
+
+```{r,write out sweep summary file}
+all_sweep_info_total_list_sweep_new_dist_export=all_sweep_info_total_list_sweep_new_dist %>% select(class,family,genus,species,scaffold,nc,max_dist,mean_dist,max_SNP,mean_SNP,D,Pval.beta,n) %>% arrange(class,scaffold)
+all_sweep_info_total_list_sweep_new_dist_export$scaffold=gsub('diffH','',all_sweep_info_total_list_sweep_new_dist_export$scaffold)
+names(all_sweep_info_total_list_sweep_new_dist_export)=c('Category','Family','Genus','Species','Sweep','Sweep size','max_dist','mean_dist','max_SNP','mean_SNP',
+                                                         "Tajima's D",'Pval.beta','number of genes with dN/dS>2')
+
+all_sweep_info_total_list_sweep_new_dist_export$`number of genes with dN/dS>2`[is.na(all_sweep_info_total_list_sweep_new_dist_export$`number of genes with dN/dS>2`)]=0
+
+all_sweep_info_total_list_sweep_new_dist_export_2=all_sweep_info_total_list_sweep_new_dist_export %>% filter(Category!='probiotics')
+
+all_sweep_info_total_list_sweep_new_dist_export$SGB=sapply(strsplit(all_sweep_info_total_list_sweep_new_dist_export$Sweep,split = '_'),'[[',1)
+
+#Table S1
+write.csv(all_sweep_info_total_list_sweep_new_dist_export,'TableS1_sweep_summary_values.csv',row.names = F)
+#
+#Table S1
+#write.csv(all_sweep_info_total_list_sweep_new_dist_export_2,'TableS1_sweep_summary_values_2.csv',row.names = F)
+
+```
+
+```{r outer circle}
+#The difference between Continent_2 and Continent is that Continent separates Traditionally-isolated as an individual category, while Continent_2 only uses the original continent information 
+sweep_df_country=sweep_df %>% group_by(taxa,Continent_2,group) %>%
+  summarise(nc=n())
+
+sweep_df_country_s=sweep_df_country %>% group_by(group,Continent_2,taxa) %>% summarise(nc=sum(nc)) %>%
+  filter(group=='new_sweep') 
+
+#unknown samples in each sweep do not count as continents
+sweep_df_country_count=sweep_df_country %>% group_by(group,taxa) %>%
+  filter(group=='new_sweep') %>% filter(!(Continent_2 %in% c('Unknown'))) %>%
+                                          summarise(distinct_continents = n_distinct(Continent_2)) 
+
+#this is done so that if a sweep is only in unknown for geography, it counts as one continent, and that "Unknown" is not counted as a sweep
+sweep_df_country_count_2=sweep_df_country %>% group_by(group,taxa) %>%
+  filter(group=='new_sweep') %>% filter(Continent_2 %in% c('Unknown')) %>%
+                                          summarise(distinct_continents = n_distinct(Continent_2)) %>% filter(!(taxa %in% sweep_df_country_count$taxa))
+
+
+sweep_df_country_count=bind_rows(sweep_df_country_count,sweep_df_country_count_2)
+
+
+#sweep_df_country_is_trad=sweep_df_country %>% group_by(group,taxa) %>%
+#  filter(group=='new_sweep') %>% filter(!(Continent %in% c('Unknown'))) %>%
+#  mutate(is_trad=case_when(Continent=='Traditionally-isolated' ~ 1, TRUE ~ 0),
+#         is_mod=case_when(Continent!='Traditionally-isolated' ~ 1, TRUE ~ 0))
+
+#sweep_df_country_is_trad_sum=sweep_df_country_is_trad %>% group_by(taxa) %>%
+#  summarise(is_trad_sum=sum(is_trad),is_mod_sum=sum(is_mod))
+
+#sweep_df_country_is_trad_sum=sweep_df_country_is_trad_sum %>%
+#  mutate(lifestyle=case_when(is_trad_sum>0 & is_mod_sum>0 ~ 'Both',
+#                             is_trad_sum>0 & is_mod_sum==0 ~ 'Traditionally-isolated #only',
+#                             TRUE ~ 'Non-isolated'))
+                             
+p_continent=ggplot(sweep_df_country_s,aes(x=Continent_2,y=reorder(taxa,desc(taxa)),
+                                          col=Continent_2,size=nc))+
+  geom_point()+theme_classic()+
+  theme(legend.position = "bottom",axis.text.y=element_blank(),axis.ticks.y=element_blank(),
+        axis.title.y=element_blank(),axis.line.y = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size=14),
+        axis.title.x=element_blank(),
+        legend.text=element_text(size=18),legend.title=element_text(size=18,face = "bold"),
+        legend.background = element_rect(size = 0.5))+
+  guides(color=guide_legend(ncol = 2, byrow=TRUE,title.position = "top",
+                            override.aes = list(size = 5),title='Geography'),
+         size=guide_legend(ncol = 1, byrow=TRUE,title.position = "top",title='No. of samples'))+
+   scale_color_pomological()
+
+```
+
+
+```{r build tree with selected SGBs}
+all_sweep_info_total_list_sweep_new_dist_1$SGB=sapply(strsplit(all_sweep_info_total_list_sweep_new_dist_1$scaffold, 'diffH'),'[[',1)
+all_sweep_info_total_list_sweep_new_dist_1$cluster_taxa=paste(all_sweep_info_total_list_sweep_new_dist_1$species,all_sweep_info_total_list_sweep_new_dist_1$SGB,sep = '_')
+
+all_sweep_info_total_list_sweep_new_dist_1s=all_sweep_info_total_list_sweep_new_dist_1 %>% group_by(SGB) %>% sample_n(1)
+
+
+ctss=keep.tip(ct,all_sweep_info_total_list_sweep_new_dist_1s$scaffold)
+ctss=midpoint(ctss)
+all_sweep_info_total_list_sweep_new_uniq_2=all_sweep_info_total_list_sweep_new %>%
+  select(scaffold,cluster_taxa) %>% distinct()
+newtip2=inner_join(data.frame(tip.label=ctss$tip.label),all_sweep_info_total_list_sweep_new_uniq_2,by=c('tip.label'='scaffold'))
+ctss$tip.label=newtip2$cluster_taxa
+ctss_tipseq=get_taxa_name(ggtree(ctss))
+
+all_sweep_info_total_list_sweep_new_dist_1$cluster_taxa=as.factor(all_sweep_info_total_list_sweep_new_dist_1$cluster_taxa)
+all_sweep_info_total_list_sweep_new_dist_1$cluster_taxa=factor(all_sweep_info_total_list_sweep_new_dist_1$cluster_taxa, levels = ctss_tipseq)
+all_sweep_info_total_list_sweep_new_dist_1$species_scaffold=paste(all_sweep_info_total_list_sweep_new_dist_1$species,all_sweep_info_total_list_sweep_new_dist_1$scaffold,sep = '_')
+all_sweep_info_total_list_sweep_new_dist_1$species_scaffold=gsub('diffH','',all_sweep_info_total_list_sweep_new_dist_1$species_scaffold)
+#sweep_df_country_count$taxa1=as.character(sweep_df_country_count$taxa)
+all_sweep_info_total_list_sweep_new_dist_2=merge(all_sweep_info_total_list_sweep_new_dist_1,sweep_df_country_count, by.x='species_scaffold',by.y='taxa')
+all_sweep_info_total_list_sweep_new_dist_2=all_sweep_info_total_list_sweep_new_dist_2 %>% mutate(Continents=case_when(distinct_continents>1 ~ 'Yes', TRUE ~'No'))
+all_sweep_info_total_list_sweep_new_dist_2$distinct_continents=as.factor(all_sweep_info_total_list_sweep_new_dist_2$distinct_continents)
+
+all_sweep_info_total_list_sweep_new_dist_2$SNP5=all_sweep_info_total_list_sweep_new_dist_2$max_SNP/5/2
+
+all_sweep_info_total_list_sweep_new_dist_2$SNP10=all_sweep_info_total_list_sweep_new_dist_2$max_SNP/10/2
+
+sum(all_sweep_info_total_list_sweep_new_dist_2$SNP5<=100 & all_sweep_info_total_list_sweep_new_dist_2$Continents=='Yes')
+
+all_sweep_info_total_list_sweep_new_dist_2$cluster_taxa_o=
+  gsub('s__','',all_sweep_info_total_list_sweep_new_dist_2$cluster_taxa)
+all_sweep_info_total_list_sweep_new_dist_2$cluster_taxa_o=gsub('_',' ',all_sweep_info_total_list_sweep_new_dist_2$cluster_taxa_o)
+
+all_sweep_info_total_list_sweep_new_dist_2$cluster_taxa_o=as.factor(all_sweep_info_total_list_sweep_new_dist_2$cluster_taxa_o)
+p_dist=ggplot(all_sweep_info_total_list_sweep_new_dist_2,aes(x=SNP5,y=reorder(cluster_taxa_o,desc(cluster_taxa)),size=log10(nc),color=Continents))+
+  geom_errorbar(aes(xmin=SNP10,xmax=max_SNP/2,color=Continents),width=0,linewidth=0.5,alpha=0.6)+
+  geom_point()+theme_minimal()+
+  scale_y_discrete(labels = function(x) {
+    sapply(x, function(label) {
+      parts <- strsplit(label, "SGB")[[1]]
+      parts[[2]]=paste0("(SGB",parts[[2]],")")
+      italicized_parts <- lapply(parts, function(part) bquote(italic(.(part))))
+      bquote(.(italicized_parts[[1]])~.(parts[[2]]))
+    })
+  })+
+  scale_color_manual(values=wes_palette(n=2, name="Royal1"))+
+  theme(legend.position = "right",
+        axis.title.y=element_blank(),axis.line.y = element_blank(),
+        axis.text.y = element_text(size=14),
+        axis.text.x = element_text(size=14),
+        axis.title.x = element_text(size=14,face="bold"),
+        legend.text=element_text(size=14),legend.title=element_text(size=14,face = "bold"),
+        legend.background = element_rect(color = NA))+
+#  xlab('Maximum pairwise SNP distance in sweep')+
+  xlab('Estimated sweep age')+
+  scale_x_log10()+
+  guides(
+         size=guide_legend(ncol = 1, byrow=TRUE,title.position = "top",title='log10 (Sweep size)'), color=guide_legend(title='Cross continent',override.aes = list(size = 5)))
+
+#ctss$tip.label=label_pad(ctss$tip.label,justify = "left")
+p_tree=ggtree(ctss)+xlim_expand(c(0, 0.5), 'Tree')
+combined_pro=ggarrange(p_tree, p_dist,align='h',widths = c(0.1, 1))
+
+png(paste0('sweep_summary/','all_commensal_dist_summary_2e2.png'),width=3600,height=2800,res=300)
+print(combined_pro)
+dev.off()
+
+ggarrange(p_tree, p_dist,align='h',widths = c(0.1, 1)) %>%
+  ggexport(filename=paste0('sweep_summary/','all_commensal_dist_summary_2e3.png'),width=4000,height=3000,res=330)
+
+
+
+BU_example=all_sweep_info_total_list_sweep_new_dist_2 %>% filter(cluster_taxa_o=='Bacteroides uniformis SGB1836')
+
+p_dist_BU=ggplot(BU_example,aes(x=SNP5,y=reorder(cluster_taxa_o,desc(cluster_taxa)),size=nc,color=Continents))+
+  geom_errorbar(aes(xmin=SNP10,xmax=max_SNP/2,color=Continents),width=0,linewidth=0.5,alpha=0.6)+
+  geom_point()+theme_minimal()+
+  scale_color_manual(values=wes_palette(n=2, name="Royal1"))+
+  theme(legend.position = "top",
+        axis.title.y=element_blank(),axis.line.y = element_blank(),
+        axis.text.y = element_text(size=14),
+        axis.text.x = element_text(size=14),
+        axis.title.x = element_text(size=14,face="bold"),
+        legend.text=element_text(size=14),legend.title=element_text(size=14,face = "bold"),
+        legend.background = element_rect(color = NA))+
+  scale_y_discrete(labels = function(x) {
+    sapply(x, function(label) {
+      parts <- strsplit(label, "SGB")[[1]]
+      parts[[2]]=paste0("(SGB",parts[[2]],")")
+      italicized_parts <- lapply(parts, function(part) bquote(italic(.(part))))
+      bquote(.(italicized_parts[[1]])~.(parts[[2]]))
+    })
+  })+
+  xlab('Estimated sweep age')+
+  scale_x_log10()+
+  guides(
+         size=guide_legend(nrow = 1, byrow=TRUE,title.position = "top",title='Sweep size'), color=guide_legend(title='Cross continent',override.aes = list(size = 5)))
+
+png(paste0('sweep_summary/','dist_summary_BU_example.png'),width=3000,height=700,res=300)
+print(p_dist_BU)
+dev.off()
+
+
+```
+
+
+
+
+
+
+
+
+```{r is the sweep local}
+
+sweep_df_list=split(sweep_df,f=sweep_df$taxa)
+sweep_df_p_list=list()
+for (i in 1:length(sweep_df_list)){
+  sweep_tab=sweep_df_list[[i]] %>% count(Continent_2,group) %>% spread(group,n,fill = 0)
+  # sweep_tab = sweep_tab %>% mutate(Country = case_when(new_sweep==0 ~ 'others', TRUE ~ Country))
+  sweep_tab= sweep_tab %>% group_by(Continent_2) %>% summarise(new_sis_sweep=sum(new_sis_sweep),
+                                                             new_sweep=sum(new_sweep)) %>% 
+    select(-Continent_2)
+  if (nrow(sweep_tab)>1){
+    sweep_df_p_list[[i]]=fisher.test(sweep_tab,workspace = 4000000)$p.value
+  } else {
+    sweep_df_p_list[[i]]=1
+  }
+}
+
+
+names(sweep_df_p_list)=names(sweep_df_list)
+sweep_df_p=as.data.frame(unlist(sweep_df_p_list))
+sweep_df_p$taxa=as.factor(rownames(sweep_df_p))
+names(sweep_df_p)=c('pvalue','taxa')
+sweep_df_p=sweep_df_p %>% mutate('Global\ndistribution'=case_when(pvalue<=0.05 | pvalue==1 ~ 'Significantly biased',pvalue>0.05 ~ 'Not signficiantly biased'))
+
+
+sweep_df_p$taxa=factor(sweep_df_p$taxa,levels=ct_tipseq)
+
+p_local=ggplot(sweep_df_p,aes(x='local',y=reorder(taxa,desc(taxa)),fill=local))+
+  geom_tile()+theme_classic()+
+  scale_fill_manual(values = c('grey80','burlywood1'))+
+  theme(legend.position = "bottom",axis.text.y=element_blank(),axis.ticks.y=element_blank(),
+        axis.title.y=element_blank(),axis.line.y = element_blank(),axis.text.x=element_text(size=18,angle = 90),axis.title.x=element_blank(),
+        legend.text=element_text(size=18),legend.title=element_text(size=18,face = "bold"),
+        legend.direction='vertical',
+        legend.background = element_rect(size = 0.5),
+        plot.margin = unit(c(1,0,1,0), "cm"))+
+  labs(fill="Local")+
+  coord_cartesian(expand = FALSE)
+
+```
+
+```{r}
+p_count=ggplot(all_sweep_info_total_list_sweep_new_ss_count,aes(x=n, color=class, fill=class)) +
+  geom_histogram(alpha=0.6, binwidth = 1,just=0.5) +
+  scale_fill_manual(values = c('lightblue4','#661100','lightsalmon3')) +
+  scale_color_manual(values = c('lightblue4','#661100','lightsalmon3')) +
+  scale_x_continuous(breaks = 1:10)+
+  theme_bw()+
+  theme(
+    legend.position="none",
+    panel.spacing = unit(0.1, "lines"),
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14),  # Font size for axis titles
+    axis.text = element_text(size = 14),  # Font size for axis labels
+    legend.text = element_text(size = 14),  # Font size for legend labels
+    legend.title = element_text(size = 16) 
+  ) +
+  facet_wrap(~class,ncol=1,scales = "free_y")+
+
+  xlab("Number of sweeps in SGB")+
+  ylab('Number of SGBs')
+
+png('sweep_summary/sweep_count_by_taxa_with_MG.png', res=300, width = 1200,height = 2000)
+p_count
+dev.off()
+
+all_sweep_info_total_list_sweep_new_ss_count_2=all_sweep_info_total_list_sweep_new_ss_count %>% filter(class!='probiotics')
+
+p_count_2=ggplot(all_sweep_info_total_list_sweep_new_ss_count_2,aes(x=n, color=class, fill=class)) +
+  geom_histogram(alpha=0.8, binwidth = 1,just=0.5) +
+  scale_fill_manual(values = c('lightblue4','thistle')) +
+  scale_color_manual(values = c('lightblue4','thistle')) +
+  scale_x_continuous(breaks = 1:10)+
+  theme_bw()+
+  theme(
+    legend.position="none",
+    panel.spacing = unit(0.1, "lines"),
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14),  # Font size for axis titles
+    axis.text = element_text(size = 14),  # Font size for axis labels
+    legend.text = element_text(size = 14),  # Font size for legend labels
+    legend.title = element_text(size = 16) 
+  ) +
+  facet_wrap(~class,ncol=1,scales = "free_y")+
+
+  xlab("number of sweeps in SGB")+
+  ylab('number of SGBs')
+
+#png('sweep_summary/sweep_count_by_taxa_with_MG_2.png', res=300, width = 1000,height = 1500)
+p_count_2
+#dev.off()
+
+all_sweep_info_total_list_sweep_new_ss_count_c= all_sweep_info_total_list_sweep_new_ss_count %>% filter(class=='commensals')
+sum(all_sweep_info_total_list_sweep_new_ss_count_c$n>1)/nrow(all_sweep_info_total_list_sweep_new_ss_count_c)
+
+all_sweep_info_total_list_sweep_new_ss_count_p= all_sweep_info_total_list_sweep_new_ss_count %>% filter(class=='pathogens')
+sum(all_sweep_info_total_list_sweep_new_ss_count_p$n>1)/nrow(all_sweep_info_total_list_sweep_new_ss_count_p)
+
+all_sweep_info_total_list_sweep_new_ss_count_p2= all_sweep_info_total_list_sweep_new_ss_count %>% filter(class=='probiotics')
+sum(all_sweep_info_total_list_sweep_new_ss_count_p2$n>1)/nrow(all_sweep_info_total_list_sweep_new_ss_count_p2)
+
+```
+
+```{r put continent and tree together}
+#put together continent with tree
+
+#p2 <- p + 
+#  new_scale_fill()+
+#  geom_fruit(
+#    data=sweep_df_country_s,
+#    geom=geom_tile,
+#    mapping=aes(x=Continent_2,y=taxa),
+#    color = "grey", fill='lightblue4',offset = 0.05,size = 0.2,pwidth=0.6,
+#    axis.params = list(axis = "x",text.size  = 3, hjust=1.5))+
+#  scale_fill_brewer(palette = "Paired")+
+#  guides(color=guide_legend(ncol=3,override.aes = list(size=5,shape=15)))
+
+p3a <- p + 
+  new_scale_fill()+
+  geom_fruit(data=sweep_df_p,
+             geom=geom_tile,
+             mapping=aes(x='',y=taxa,fill=`Global\ndistribution`),offset = 0.05,width=0.05,
+             axis.params=list(
+                          axis="x", # add axis text of the layer.
+                       text.angle=-90, # the text angle of x-axis.
+                          hjust=0, # adjust the horizontal position of text of axis.
+  vjust=0.9,                        
+  text.size  = 3
+                      ))+
+            scale_fill_manual(values = c('grey80','burlywood1'))+
+  theme(legend.position = 'bottom',legend.title=element_text(size=10))+
+  guides(color=guide_legend(ncol=2))
+
+png('sweep_summary/tree_continent_local_test.png',width=3000,height=2000,res=300)
+print(p3a)
+dev.off()
+
+
+sweep_df_country_count$group=NULL
+
+p3b=p3a+
+  new_scale_fill()+
+  geom_fruit(
+    data=sweep_df_country_count,
+    geom=geom_bar,
+    mapping=aes(x=distinct_continents,y=taxa),
+    stat="identity",
+    fill = "lightblue4", offset = 0.05,size = 0.05,alpha=0.6,
+    pwidth=0.3,
+    axis.params = list(axis = "x",title="No. of continents",title.size = 0, title.height=0.04,
+                       title.angle=2,
+                       text.size  = 3,vjust=1,nbreak=6),
+    grid.params=list(color='#333333'))+
+  theme(legend.position = 'right',legend.text = element_text(face = "italic"))+
+  guides(color=guide_legend(ncol=1,title='Family',override.aes = list(size=5,shape=15)))
+
+png('sweep_summary/tree_continent_local_2.png',width=2000,height=2000,res=300)
+print(p3b)
+dev.off()
+
+p3c=p+
+  new_scale_fill()+
+  geom_fruit(
+    data=sweep_df_country_count,
+    geom=geom_bar,
+    mapping=aes(x=distinct_continents,y=taxa),
+    stat="identity",
+    fill = "lightblue4", offset = 0.05,size = 0.05,alpha=0.6,
+    pwidth=0.3,
+    axis.params = list(axis = "x",title="No. of continents",title.size = 0, title.height=0.04,
+                       title.angle=2,
+                       text.size  = 3,vjust=1,nbreak=6),
+    grid.params=list(color='#333333'))+
+  
+  theme(legend.position = 'right',legend.text = element_text(face = "italic"))+
+  guides(color=guide_legend(ncol=3,title='Family',override.aes = list(size=5,shape=15)))
+
+png('sweep_summary/tree_continent_nolocal.png',width=3000,height=1500,res=300)
+print(p3c)
+dev.off()
+
+sweep_df_country_count_p=left_join(sweep_df_country_count,sweep_df_p,by='taxa')
+sum(sweep_df_country_count_p$distinct_continents>1 & sweep_df_country_count_p$`Global\ndistribution`=='Not signficiantly biased')
+```
+
+```{r}
+all_sweep_info_total_list_sweep_new_ss_dist=all_sweep_info_total_list_sweep_new_ss %>%
+  filter(class=='commensals') %>%
+  group_by(SGB,family,scaffold) %>% summarise(mean_dist=mean(mean_dist),max_dist=mean(max_dist),n=n()) 
+
+all_sweep_info_total_list_sweep_new_ss_D=all_sweep_info_total_list_sweep_new_ss %>%
+  filter(class=='commensals') %>%
+  group_by(SGB,family,scaffold) %>% summarise(D=mean(D),p=mean(Pval.beta)) %>%
+  filter(!is.na(D))
+all_sweep_info_total_list_sweep_new_ss_D=all_sweep_info_total_list_sweep_new_ss_D %>%
+  mutate(Significance=case_when(p<=0.001 ~ '***',
+                                p>0.001 & p<=0.01 ~ '**',
+                                p>0.01 & p<=0.1 ~ '*',
+                                TRUE ~ 'n.s.'))
+
+all_sweep_info_total_list_sweep_new_ss_D$significance=factor(all_sweep_info_total_list_sweep_new_ss_D$Significance,
+                                                             levels=c('***',"**","*","n.s."))
+
+hist_tajima = ggplot(all_sweep_info_total_list_sweep_new_ss_D, aes(x = D, fill=Significance)) +
+  geom_histogram(binwidth = 0.25,just=0,alpha=0.6) +
+  scale_fill_brewer(type = 'div',direction = -1) +
+  labs(x = "Tajima's D",
+       y = "Number of sweeps")+
+  theme_bw()+
+  theme(text = element_text(size=16))
+
+
+all_sweep_info_total_list_sweep_new_ss_dnds=
+  left_join(all_sweep_info_total_list_sweep_new_ss_dist,new_sis_sweep_gene_pos_total,
+            by='scaffold') 
+all_sweep_info_total_list_sweep_new_ss_dnds$n.y[is.na(all_sweep_info_total_list_sweep_new_ss_dnds$n.y)]=0
+all_sweep_info_total_list_sweep_new_ss_dnds=all_sweep_info_total_list_sweep_new_ss_dnds %>%
+ mutate(group=case_when(n.y>=100 ~ '100-999',
+                        n.y>=10 & n.y<100 ~ '10-99',
+                        n.y>=1 & n.y<10 ~ '1-9',
+                                TRUE ~ '0')) %>%
+  mutate(Type=case_when(n.y==0 ~ 'No dN/dS>2', TRUE ~ 'dN/dS>2'))
+
+all_sweep_info_total_list_sweep_new_ss_dnds_summary=all_sweep_info_total_list_sweep_new_ss_dnds %>%
+  group_by(group,Type) %>% summarise(n=n())
+  
+#custom_breaks <- c(-1, seq(0,round(max(all_sweep_info_total_list_sweep_new_ss_dnds$n.y),3),50))
+#hist_dnds=ggplot(all_sweep_info_total_list_sweep_new_ss_dnds, aes(x = n.y)) +
+# geom_histogram(breaks = custom_breaks,just=-1,alpha=0.6) +
+#scale_fill_brewer(palette = "Dark2")+
+#  scale_x_continuous(trans = "log10") +
+#labs(x = "# of genes with dnds>1",
+#       y = "# of sweeps")+
+#  theme_bw()
+
+hist_dnds=ggplot(all_sweep_info_total_list_sweep_new_ss_dnds_summary, aes(x = group,y=n,fill=Type)) +
+  geom_bar(stat = 'identity',alpha=0.6) +
+  scale_fill_brewer(palette = "Dark2")+
+  #  scale_x_continuous(trans = "log10") +
+  labs(x = "Number of genes with dN/dS>2",
+       y = "Number of sweeps")+
+  theme_bw()+
+  theme(text = element_text(size=16))
+
+png(paste0('sweep_summary/','hist_commensals_summary_2.png'),width=2000,height=1600,res=300)
+print(ggarrange(hist_tajima,hist_dnds,ncol=1,align = 'v'))
+dev.off()
+
+ggarrange(hist_tajima,hist_dnds,ncol=1,align = 'v') %>%
+  ggexport(filename =paste0('sweep_summary/','hist_commensals_summary_2.png'),
+           width=2500,
+           height=2000,res=330)
+
+```
+#write out 
+```{r}
+isolate_list=readRDS('isolate_list.rds')
+single_MG_n_list=readRDS('single_MG_n_list.rds')
+single_MG_n_total=bind_rows(single_MG_n_list)
+isolate_n_total=bind_rows(isolate_list)
+mixed_MG_n_total=read.table('nMG_mixed.txt')
+exist_MG_n_total=read.table('nMG_exist.list')
+names(mixed_MG_n_total)=c('MG_mixed_n','SGB')
+names(exist_MG_n_total)=c('MG_exist_n','SGB')
+mixed_MG_n_total$SGB=gsub('mixed_','',mixed_MG_n_total$SGB)
+mixed_MG_n_total$SGB=gsub('.txt','',mixed_MG_n_total$SGB)
+mixed_MG_n_total$SGB=gsub('_group','',mixed_MG_n_total$SGB)
+mixed_MG_n_total$SGB=gsub('10068','10068s',mixed_MG_n_total$SGB)
+exist_MG_n_total$SGB=gsub('_exist','',exist_MG_n_total$SGB)
+exist_MG_n_total$SGB=gsub('.txt','',exist_MG_n_total$SGB)
+exist_MG_n_total$SGB=gsub('_group','',exist_MG_n_total$SGB)
+exist_MG_n_total$SGB=gsub('10068','10068s',exist_MG_n_total$SGB)
+
+all_sweep_info_total_list_sweep_summary=all_sweep_info_total_list_sweep_new %>% 
+  group_by(SGB,sweep,group) %>%
+  summarise(mean_dist=mean(dist),min_dist=min(dist),n=n())
+
+
+all_sweep_info_total_list_sweep_summary_s=all_sweep_info_total_list_sweep_summary %>%
+  filter(group=='new_sweep') %>% select(SGB,sweep,group,mean_dist,n)
+all_sweep_info_total_list_sweep_summary_ss=all_sweep_info_total_list_sweep_summary %>%
+  filter(group=='new_sis_sweep') %>% select(SGB,sweep,group,min_dist,n)
+
+all_sweep_info_total_list_sweep_summary_new=merge(all_sweep_info_total_list_sweep_summary_s,
+                                                  all_sweep_info_total_list_sweep_summary_ss,
+                                                  by=c('SGB','sweep'))
+
+all_sweep_info_total_list_sweep_summary_new=merge(all_sweep_info_total_list_sweep_summary_new,
+                                                  taxa_list_summary,by.x='SGB', 
+                                                  by.y = 'cluster')
+
+all_sweep_info_total_list_sweep_summary_new=all_sweep_info_total_list_sweep_summary_new %>% 
+  mutate(class=case_when(cluster_taxa %in% SGB_class$pathogen ~ 'pathogens',
+                         cluster_taxa %in% SGB_class$probiotics ~ 'probiotics',
+                         TRUE ~ 'commensals'))
+
+
+all_sweep_info_total_list_SGB_summary=all_sweep_info_total_list_sweep_summary_new %>% 
+  group_by(SGB) %>%
+  summarise(n_in_sweep=sum(n.x))
+single_MG_n_total=single_MG_n_total %>% distinct()
+isolate_n_total=isolate_n_total %>% distinct()
+all_sweep_info_total_list_SGB_summary=merge(all_sweep_info_total_list_SGB_summary,
+                                            single_MG_n_total,by='SGB',all.x=T)
+all_sweep_info_total_list_SGB_summary=merge(all_sweep_info_total_list_SGB_summary,
+                                            isolate_n_total,by='SGB',all.x=T)
+
+#correct for the wrong isolate
+BF=which(all_sweep_info_total_list_SGB_summary$SGB=='SGB1855')
+all_sweep_info_total_list_SGB_summary$isolate_n[BF]=all_sweep_info_total_list_SGB_summary$isolate_n[BF]-1
+
+all_sweep_info_total_list_SGB_summary$MG_n[is.na(all_sweep_info_total_list_SGB_summary$MG_n)]=0
+
+all_sweep_info_total_list_SGB_summary$total_n=all_sweep_info_total_list_SGB_summary$isolate_n+
+  all_sweep_info_total_list_SGB_summary$MG_n
+all_sweep_info_total_list_SGB_summary=merge(all_sweep_info_total_list_SGB_summary,
+                                            mixed_MG_n_total,by='SGB',all.x=T)
+all_sweep_info_total_list_SGB_summary=merge(all_sweep_info_total_list_SGB_summary,
+                                            exist_MG_n_total,by='SGB',all.x=T)
+
+
+
+
+write.csv(all_sweep_info_total_list_SGB_summary,'all_sweep_info_total_list_SGB_summary.csv',row.names = F)
+
+
+all_sweep_info_total_list_SGB_summary_ns=merge(all_sweep_info_total_list_SGB_summary,
+                all_sweep_info_total_list_sweep_new_ss_count,by='SGB')
+
+all_sweep_info_total_list_SGB_summary_ns_c=all_sweep_info_total_list_SGB_summary_ns %>% filter(class=='commensals')
+all_sweep_info_total_list_SGB_summary_ns_p=all_sweep_info_total_list_SGB_summary_ns %>% filter(class=='pathogens')
+
+
+cor.test(all_sweep_info_total_list_SGB_summary_ns_c$total_n,all_sweep_info_total_list_SGB_summary_ns_c$n,method = "spearman")
+cor.test(all_sweep_info_total_list_SGB_summary_ns_p$total_n,all_sweep_info_total_list_SGB_summary_ns_p$n,method = "spearman")
+
+
+
+                
+
+
+```
