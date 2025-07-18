@@ -1,0 +1,1960 @@
+---
+title: "strainphlan_allcurate_CRC_IBD_T2D"
+output: html_document
+date: "2025-04-06"
+
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = 'C:/Users/Xiaoqian/Desktop/pop_gen/UHGG_plus4/strainphlan/allcurated_with_IBD_T2D_meta4_beta1_vJan21')
+```
+
+##setup
+```{r libararies, include=FALSE}
+library(phangorn)
+library(ggtree)
+library(ggplot2)
+library(castor)
+library(RColorBrewer)
+library(dplyr)
+library(ggnewscale)
+library(reshape2)
+library(purrr)
+library(ComplexHeatmap)
+library(tidyr)
+library(SignifReg)
+library(tibble)
+library(caret)
+library(scales)
+library(forcats)
+library(phytools)
+library(ggtext)
+library(wesanderson)
+
+```
+
+```{r source, echo=FALSE}
+source('../merge4d_meta4_beta1_vJan21/sweep_finder.R')
+```
+
+#import tree data and call sweeps
+```{r import data, echo=FALSE}
+folder_list_all <- Sys.glob("*_marker/")
+tree_list_all=lapply(folder_list_all, function(x) Sys.glob(paste0(x,'RAxML_bestTree*.tre')))
+
+taxa_list=read.table("../../fastANI_clust.average.diffH.94s.fgspecies.txt",
+                     sep='\t',header=T)
+taxa_list_summary=taxa_list %>% group_by(cluster) %>% count(fgspecies) %>% slice_max(order_by=n,with_ties = F)
+taxa_list_summary$species=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',3)
+taxa_list_summary$genus=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',2)
+taxa_list_summary=taxa_list_summary %>% mutate(taxa = case_when(species=='s__' ~ paste0(genus,'_',species),
+                                                                TRUE ~ paste0(species)))
+taxa_list_summary$cluster_taxa=paste(taxa_list_summary$taxa,
+                                     taxa_list_summary$cluster,sep = "_")
+taxa_list_summary=taxa_list_summary %>% arrange(genus)
+
+sweep_list_all=read.csv('../../instrain/confirmed_sweep_from_pairwise.csv')
+df_strainphlan_cutoff=read.csv('../../SGBdiffH_500_1pois_1nb_finda/strainphlan_cutoff_new.csv')
+
+sweep_list_all$SGB=sapply(strsplit(sweep_list_all$scaffold,split = 'diffH'),'[[',1)
+sweep_list_all=left_join(sweep_list_all,taxa_list_summary,by=c("SGB"="cluster"))
+
+
+```
+
+```{r}
+rf_list=list()
+sf_list=list()
+newtotalsweep_list=list()
+newtotalstrain_list=list()
+for (i in 1: length(folder_list_all)){
+  
+  SGB=gsub('_marker/','',strsplit(folder_list_all[[i]],split='SGB')[[1]][2])
+  SGB=paste0("SGB",SGB)
+  SGB=gsub('_group','',SGB)
+  SGB=gsub('10068','10068s',SGB)
+  taxa=taxa_list_summary$cluster_taxa[taxa_list_summary$cluster==SGB]
+  cutoff=df_strainphlan_cutoff$cutoff[df_strainphlan_cutoff$X==taxa]
+  sweep=sweep_list_all$scaffold[grep(SGB,sweep_list_all$scaffold)]
+  total_sweep=lapply(sweep, function(x) read.table(paste0("../../instrain/compare_select_lists/",x,"_sweep.txt"),header = F))
+  names(total_sweep)=paste0('sweep',seq_along(total_sweep))
+  
+  if (length(sweep)>0){
+    tree_file=tree_list_all[[i]]
+    t=read_tree(file=tree_file)
+    t$tip.label=gsub("BIS","-BIS",t$tip.label)
+    t$tip.label=gsub("_marker","",t$tip.label)
+    t=midpoint(t)
+    t$node.label=1:t$Nnode+Ntip(t)
+    newtotalstrain_list[[i]]=data.frame(V1=t$tip.label)
+    names(newtotalstrain_list)[i]=taxa
+    dist_all=c(get_all_pairwise_distances(t,only_clades=t$tip.label))
+    if(length(cutoff)==0){
+      cutoff=10^-3/median(dist_all)
+    }
+    t$edge.length=t$edge.length/median(dist_all)
+    ratio_df=sweep_finder(t,cutoff)
+    ratio_df_5=ratio_df %>% filter(ratio>=5)
+   ratio_df_5$new_mean=sapply(ratio_df_5$node, function(x) get_new_mean(x))
+    ratio_df_5=ratio_df_5 %>% mutate(new_ratio=case_when(is.na(new_mean) ~ ratio, TRUE ~ mean_outdist/new_mean))             
+   ratio_df_5f= ratio_df_5 %>% filter(new_ratio>=5)   
+    newsweep=lapply(ratio_df_5f$node, function(x) {y=as.data.frame(get_subtree_at_node(t, x-Ntip(t))$subtree$tip.label);
+    names(y)="V1";y})
+    newsweep=Filter(function(x) nrow(x) > 2, newsweep)
+    
+    
+    if (length(newsweep>0)){
+      names(newsweep)=paste0('newsweep',seq_along(newsweep))
+      newtotalsweep=merge_sweeps(newsweep,list())
+      #newtotalsweep=newsweep
+      
+      rf_list[[i]]=c(compare_sweeps_2_withMG(total_sweep,newtotalsweep))
+      sf_list[[i]]=c(length(compare_sweeps_withMG(total_sweep,newtotalsweep))/length(total_sweep),
+                     length(compare_sweeps_withMG(newtotalsweep,total_sweep))/length(newtotalsweep))
+      newtotalsweep_list[[i]]=newtotalsweep
+      names(rf_list)[i]=taxa
+      names(sf_list)[i]=taxa
+      names(newtotalsweep_list)[i]=taxa
+    }
+  }
+}
+
+
+
+```
+
+
+
+## import metadata
+```{r metagenomes}
+
+baseline_data_age=read.csv('baseline_data_age.csv')
+baseline_data_CRC=read.csv('baseline_data_CRC.csv')
+baseline_data_IBD=read.csv('baseline_data_IBD.csv')
+baseline_data_UC=read.csv('baseline_data_UC.csv')
+baseline_data_CD=read.csv('baseline_data_CD.csv')
+baseline_data_T2D=read.csv('baseline_data_T2D.csv')
+
+```
+
+
+```{r others}
+metadata_isolate=read.csv('../../UHGG_plus4_metadata.csv') 
+
+newtotalsweep_merged_list=lapply(newtotalsweep_list,function(x) bind_rows(x,.id='id'))
+newtotalsweep_merged_list=Filter(function(x) nrow(x) > 0, newtotalsweep_merged_list)
+
+SGB_class=read.csv('../../SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
+newtotalsweep_list_c=newtotalsweep_list[!(names(newtotalsweep_list) %in% c(SGB_class$pathogen,SGB_class$probiotics))]
+sum(sapply(newtotalsweep_list_c,length))
+```
+
+## age metadata sweep merge
+```{r}
+#in this step all isolates are removed, since we only merge with MG metadata,
+#this is for age
+newtotalsweep_merged_list_1=lapply(newtotalsweep_merged_list,function(x)
+  merge(baseline_data_age,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,id,disease,disease_subtype,age,age_category,country,family,non_westernized,antibiotics_current_use))
+
+#this step makes family either family or subject id, so then if we slice for family,
+#we end up slicing for both subject and family
+newtotalsweep_merged_list_1=lapply(newtotalsweep_merged_list_1,function(x)
+  x %>% mutate(family= ifelse(is.na(family),subject_id, family)) %>%
+#    filter(!(age_category %in% c('newborn','child','schoolage'))) %>%
+#    filter(disease=='healthy') %>%    #test what happens if I only consider old age and no disease
+#    filter(antibiotics_current_use=='no') %>%
+    group_by(id,family) %>% slice(1) %>% ungroup() %>% group_by(id) %>% 
+    filter(n()>2) %>% ungroup())
+
+newtotalsweep_merged_list_1=Filter(function(x) nrow(x) > 0, newtotalsweep_merged_list_1)
+
+newtotalsweep_merged_list_1c=newtotalsweep_merged_list_1[!(names(newtotalsweep_merged_list_1) %in% c(SGB_class$pathogen,SGB_class$probiotics))]
+sum(sapply(newtotalsweep_merged_list_1c,function(x)length(unique(x$id))))
+
+newtotalstrain_list_1=newtotalstrain_list[names(newtotalsweep_merged_list_1)]
+
+newtotalstrain_list_1=lapply(newtotalstrain_list_1,function(x)
+  merge(baseline_data_age,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,disease,disease_subtype,age,age_category,country,family,non_westernized,antibiotics_current_use)%>% mutate(age_category = ifelse(is.na(age_category), "adult", age_category)))
+
+
+newtotalstrain_list_1=mapply(function (x,y) x %>%
+  group_by(family) %>%
+  group_modify(~ {
+    if (any(.x$sample_id %in% y$sample_id)) {
+      .x %>% filter(sample_id %in% y$sample_id) %>% slice_sample(n = 1)
+    } else {
+      .x %>% slice_sample(n = 1)
+    }
+  }) %>%
+  ungroup(),
+  newtotalstrain_list_1,
+  newtotalsweep_merged_list_1,
+  SIMPLIFY = F
+)
+```
+
+##age sweep association
+```{r,warning=FALSE}
+# age
+newtotalsweep_unmerged_list_1=lapply(newtotalsweep_merged_list_1,
+                                     function(x) split(x,f=x$id))
+new_issweep_list_unmerged_1=mapply(function(x,y) 
+  lapply(x,function(z) y=y %>% mutate(issweep=case_when(sample_id %in% z$sample_id ~ 'sweep', TRUE~ 'notsweep'))),
+  newtotalsweep_unmerged_list_1,newtotalstrain_list_1,SIMPLIFY = F)
+
+
+new_issweep_p_unmerged_1=list()
+new_issweep_R2_unmerged_1=list()
+
+for (i in 1:length(new_issweep_list_unmerged_1)){
+  new_issweep_list_unmerged_1s=lapply(new_issweep_list_unmerged_1[[i]], function(x) x%>% select(age_category, issweep))
+  new_issweep_list_unmerged_1s=do.call(cbind,new_issweep_list_unmerged_1s)
+  issweep_names=grepl('issweep',names(new_issweep_list_unmerged_1s))
+  new_issweep_list_unmerged_1s=cbind(new_issweep_list_unmerged_1s[,1],
+                                     new_issweep_list_unmerged_1s[issweep_names])
+  names(new_issweep_list_unmerged_1s)[1]='age_category'
+  new_issweep_list_unmerged_1s=new_issweep_list_unmerged_1s %>% select(-where(~ all(. == "notsweep")))
+  new_issweep_list_unmerged_1s=new_issweep_list_unmerged_1s %>% select(-where(~ all(. == "sweep")))
+  new_issweep_list_unmerged_1s=mutate_if(new_issweep_list_unmerged_1s, is.character, as.factor)
+  if (ncol(new_issweep_list_unmerged_1s)>1){
+    new_issweep_list_unmerged_1s_glm=glm(age_category~.,
+                                         data=new_issweep_list_unmerged_1s,family='binomial')
+    
+    new_issweep_list_unmerged_1s_glm_null = glm(age_category~1,
+                                                data=new_issweep_list_unmerged_1s,family='binomial')
+    
+    scope = list(lower=formula(new_issweep_list_unmerged_1s_glm_null),
+                 upper=formula(new_issweep_list_unmerged_1s_glm))
+    
+    select.fit = SignifReg(new_issweep_list_unmerged_1s_glm_null, scope = scope, direction = "forward", trace = FALSE,adjust.method = "fdr",alpha = 0.1)
+    R2=1-(logLik(select.fit) / logLik(new_issweep_list_unmerged_1s_glm_null))
+    new_issweep_R2_unmerged_1[[i]]=R2
+    
+    new_issweep_tab_unmerged_1=lapply(new_issweep_list_unmerged_1[[i]], function(x) x%>% count(issweep,age_category) %>% spread(age_category,n,fill = 0))
+    new_issweep_tab_unmerged_1=lapply(new_issweep_tab_unmerged_1, function(x) x%>% 
+                                        select(-issweep))
+    
+    df_psweep=as.data.frame(select.fit$coefficients)
+    df_psweep$sweep=row.names(df_psweep)
+    rownames(df_psweep)=NULL
+    names(df_psweep)[1]='coef'
+    df_psweep$p.value=select.fit$steps.info$max_pvalue
+    df_psweep$sweep=gsub('.issweepsweep','',df_psweep$sweep)
+    df_psweep=df_psweep %>% filter(!is.na(p.value))
+    if (nrow(df_psweep)>=1){
+      for (s in 1:nrow(df_psweep)){
+        ss=df_psweep$sweep[s]
+        df_psweep$fp.value[s]=fisher.test(new_issweep_tab_unmerged_1[ss][[1]])$p.value
+      }
+      df_psweep$p.adjust=p.adjust(df_psweep$fp.value,method='fdr')
+    }
+  }else{
+    df_psweep=data.frame(coef=0,sweep=NA,p.value=NA,fp.value=NA,p.adjust=NA)
+  }
+  
+  new_issweep_p_unmerged_1[[i]]=df_psweep
+}
+
+names(new_issweep_p_unmerged_1)=names(new_issweep_list_unmerged_1)
+new_issweep_p_df_unmerged_1=bind_rows(new_issweep_p_unmerged_1,.id='SGB')
+new_issweep_p_df_unmerged_1=new_issweep_p_df_unmerged_1 %>% filter(!is.na(p.value))
+age_list=new_issweep_p_df_unmerged_1$p.value<0.05  #actually there has been a filter so this step is just here so the variables stay the same as before
+new_issweep_p_df_unmerged_1_age=new_issweep_p_df_unmerged_1[age_list,]
+
+#filter for commensals
+SGB_class=read.csv('../../SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
+new_issweep_p_df_unmerged_1_age=new_issweep_p_df_unmerged_1_age %>% 
+  mutate(class=case_when(SGB %in% SGB_class$pathogen ~ 'pathogens',
+                                SGB %in% SGB_class$probiotics ~ 'probiotics',
+                                TRUE ~ 'commensals'))
+new_issweep_p_df_unmerged_1_age=new_issweep_p_df_unmerged_1_age %>% 
+  filter(class=='commensals')
+
+new_issweep_list_unmerged_1_age=list()
+new_issweep_geo_p_unmerged_1_age=list()
+for (s in 1:nrow(new_issweep_p_df_unmerged_1_age)){
+  taxa=new_issweep_p_df_unmerged_1_age$SGB[s]
+  sweep=new_issweep_p_df_unmerged_1_age$sweep[s]
+ 
+  stt=new_issweep_list_unmerged_1[taxa]
+  sweep_list=stt[[1]][sweep][[1]] %>% filter(issweep=='sweep')
+  new_issweep_list_unmerged_1_age[[s]]=sweep_list
+  names(new_issweep_list_unmerged_1_age)[s]=paste(taxa,sweep,sep='-')
+  # is sweep dominated by a country, and also check sweep direction (enrich for age or no)
+  observed_freq <- table(sweep_list$country)
+  if (length(observed_freq)>1){
+    new_issweep_geo_p_unmerged_1_age[[s]]=c(chisq.test(observed_freq)$p.value,new_issweep_p_df_unmerged_1_age$coef[s]>0)
+  }else{
+    new_issweep_geo_p_unmerged_1_age[[s]]=c(0,new_issweep_p_df_unmerged_1_age$coef[s]>0)
+  }
+  names(new_issweep_geo_p_unmerged_1_age)[s]=paste(taxa,sweep,sep='-')
+}
+
+new_issweep_geo_p_unmerged_1_age_df=as.data.frame(t(bind_rows(new_issweep_geo_p_unmerged_1_age,.id='id')))
+names(new_issweep_geo_p_unmerged_1_age_df)=c('geo_enriched','age_enriched')
+new_issweep_geo_p_unmerged_1_age_df=new_issweep_geo_p_unmerged_1_age_df %>%
+  mutate(geo_enriched=case_when(geo_enriched<=0.05 ~ TRUE, TRUE ~ FALSE))
+new_issweep_geo_p_unmerged_1_age_df=new_issweep_geo_p_unmerged_1_age_df %>%
+  mutate(age_enriched=case_when(age_enriched=='1' ~ 'enriched', TRUE ~ 'depleted'))
+
+new_issweep_geo_p_unmerged_1_age_df_nogeo=new_issweep_geo_p_unmerged_1_age_df %>%
+  filter(geo_enriched==FALSE) %>% select(age_enriched)
+names(new_issweep_geo_p_unmerged_1_age_df_nogeo)='age_sweep_NONGEO'
+
+
+```
+
+
+```{r}
+colors=c('#4393C3','#D6604D')
+p1_age=Heatmap(new_issweep_geo_p_unmerged_1_age_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
+png('non_geo_sweeps_reg_age_cleaned_0.05.png',width=2000,height=2500,res=300)
+print(p1_age)
+dev.off()
+```
+
+
+#CRC metadata sweep merge
+```{r}
+
+newtotalsweep_merged_list_2=lapply(newtotalsweep_merged_list,function(x)
+  merge(baseline_data_CRC,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,id,disease,age,age_category,country,family,non_westernized,antibiotics_current_use))
+# %>%   filter(antibiotics_current_use=='no')
+#  %>%  mutate(disease = case_when(grepl("CRC", disease, ignore.case = TRUE) ~ "CRC",
+#                                 grepl("carcinoma", disease, ignore.case = TRUE) ~ "CRC",
+#                                 TRUE ~ 'non-CRC')))
+
+newtotalsweep_merged_list_2=lapply(newtotalsweep_merged_list_2,function(x)
+  x %>% 
+#  mutate(family= ifelse(is.na(family),subject_id, family)) %>%
+#   filter(!(age_category %in% c('newborn','child','schoolage'))) %>%
+        group_by(id,family) %>% slice(1) %>% ungroup() %>% 
+    group_by(id) %>% 
+    filter(n()>2) %>% 
+  ungroup())
+
+newtotalsweep_merged_list_2=Filter(function(x) nrow(x) > 0, newtotalsweep_merged_list_2)
+
+
+newtotalstrain_list_2=newtotalstrain_list[names(newtotalsweep_merged_list_2)]
+
+newtotalstrain_list_2=lapply(newtotalstrain_list_2,function(x)
+  merge(baseline_data_CRC,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,disease,disease_subtype,age,age_category,country,family, non_westernized,antibiotics_current_use))
+# %>% filter(antibiotics_current_use=='no') %>%
+#  mutate(disease = case_when(grepl("CRC", disease, ignore.case = TRUE) ~ "CRC",
+#                                 grepl("carcinoma", disease, ignore.case = TRUE) ~ "CRC",
+#                                 TRUE ~ 'non-CRC')))
+
+newtotalstrain_list_2=mapply(function (x,y) x %>%
+  group_by(family) %>%
+  group_modify(~ {
+    if (any(.x$sample_id %in% y$sample_id)) {
+      .x %>% filter(sample_id %in% y$sample_id) %>% slice_sample(n = 1)
+    } else {
+      .x %>% slice_sample(n = 1)
+    }
+  }) %>%
+  ungroup(),
+  newtotalstrain_list_2,
+  newtotalsweep_merged_list_2,
+  SIMPLIFY = F
+)
+
+```
+
+#CRC sweep association
+```{r,echo=FALSE,warning=FALSE}
+# CRC
+newtotalsweep_unmerged_list_2=lapply(newtotalsweep_merged_list_2,
+                                     function(x) split(x,f=x$id))
+new_issweep_list_unmerged_2=mapply(function(x,y) 
+  lapply(x,function(z) y=y %>% mutate(issweep=case_when(sample_id %in% z$sample_id ~ 'sweep', TRUE~ 'notsweep'))),
+  newtotalsweep_unmerged_list_2,newtotalstrain_list_2,SIMPLIFY = F)
+
+
+new_issweep_p_unmerged_2=list()
+new_issweep_R2_unmerged_2=list()
+
+#i=17 (for B.frag)
+#i=15 for B.intestinalis
+i=15
+i=21
+for (i in 1:length(new_issweep_list_unmerged_2)){
+  new_issweep_list_unmerged_2s=lapply(new_issweep_list_unmerged_2[[i]], function(x) x%>% select(disease, issweep))
+  new_issweep_list_unmerged_2s=do.call(cbind,new_issweep_list_unmerged_2s)
+  issweep_names=grepl('issweep',names(new_issweep_list_unmerged_2s))
+  new_issweep_list_unmerged_2s=cbind(new_issweep_list_unmerged_2s[,1],
+                                     new_issweep_list_unmerged_2s[issweep_names])
+  names(new_issweep_list_unmerged_2s)[1]='disease'
+  new_issweep_list_unmerged_2s=new_issweep_list_unmerged_2s %>% select(-where(~ all(. == "notsweep")))
+  new_issweep_list_unmerged_2s=new_issweep_list_unmerged_2s %>% select(-where(~ all(. == "sweep")))
+  new_issweep_list_unmerged_2s=mutate_if(new_issweep_list_unmerged_2s, is.character, as.factor)
+  
+  if (ncol(new_issweep_list_unmerged_2s)>1) {
+
+#    # Create model matrix (without response variable)
+  #  library(glmnet)
+  #    X <- model.matrix(~ ., data = new_issweep_list_unmerged_2s)[, -1]  # Remove intercept
+  #    cvfit <- cv.glmnet(X[,-1], X[,1], alpha = 1, family = "binomial")
+
+      # Find linearly dependent columns
+#      lc <- findLinearCombos(X)
+      
+#      if (length(lc$remove)>0){
+        # Remove redundant predictors
+#      new_issweep_list_unmerged_2s <- new_issweep_list_unmerged_2s[, -lc$remove]
+#      }
+    new_issweep_list_unmerged_2s_glm=glm(disease~.,
+                                         data=new_issweep_list_unmerged_2s,family='binomial')
+    
+    new_issweep_list_unmerged_2s_glm_null = glm(disease~1,
+                                                data=new_issweep_list_unmerged_2s,family='binomial')
+    
+    scope = list(lower=formula(new_issweep_list_unmerged_2s_glm_null),
+                 upper=formula(new_issweep_list_unmerged_2s_glm))
+    
+    select.fit = SignifReg(new_issweep_list_unmerged_2s_glm_null, scope = scope, direction = "forward", trace = FALSE,adjust.method = "fdr",alpha=0.1)
+    R2=1-(logLik(select.fit) / logLik(new_issweep_list_unmerged_2s_glm_null))
+    new_issweep_R2_unmerged_2[[i]]=R2
+    
+    new_issweep_tab_unmerged_2=lapply(new_issweep_list_unmerged_2[[i]], function(x) x%>% count(issweep,disease) %>% spread(disease,n,fill = 0))
+    new_issweep_tab_unmerged_2=lapply(new_issweep_tab_unmerged_2, function(x) x%>% 
+                                        select(-issweep))
+    
+    df_psweep=as.data.frame(select.fit$coefficients)
+    df_psweep$sweep=row.names(df_psweep)
+    rownames(df_psweep)=NULL
+    names(df_psweep)[1]='coef'
+    df_psweep$p.value=select.fit$steps.info$max_pvalue
+    df_psweep$sweep=gsub('.issweepsweep','',df_psweep$sweep)
+    df_psweep=df_psweep %>% filter(!is.na(p.value))
+    if (nrow(df_psweep)>=1){
+      for (s in 1:nrow(df_psweep)){
+        ss=df_psweep$sweep[s]
+        df_psweep$fp.value[s]=fisher.test(new_issweep_tab_unmerged_2[ss][[1]])$p.value
+      }
+      df_psweep$p.adjust=p.adjust(df_psweep$fp.value,method='fdr')
+    }
+  }else{
+    df_psweep=data.frame(coef=0,sweep=NA,p.value=NA,fp.value=NA,p.adjust=NA)
+  }
+  
+  new_issweep_p_unmerged_2[[i]]=df_psweep
+}
+
+names(new_issweep_p_unmerged_2)=names(new_issweep_list_unmerged_2)
+new_issweep_p_df_unmerged_2=bind_rows(new_issweep_p_unmerged_2,.id='SGB')
+new_issweep_p_df_unmerged_2=new_issweep_p_df_unmerged_2 %>% filter(!is.na(p.value))
+
+CRC_list=new_issweep_p_df_unmerged_2$p.value<0.05
+new_issweep_p_df_unmerged_2_CRC=new_issweep_p_df_unmerged_2[CRC_list,]
+
+
+ggplot(data = new_issweep_p_df_unmerged_2, aes(x = coef, y = -log10(p.value))) +
+         geom_point()+geom_hline(yintercept = 2)
+
+#new_issweep_p_df_unmerged_2_CRC_list=split(new_issweep_p_df_unmerged_2_CRC,new_issweep_p_df_unmerged_2_CRC$SGB)
+#new_issweep_p_df_unmerged_2_CRC_list_1=list()
+#for (s in 1:length(new_issweep_p_df_unmerged_2_CRC_list)){
+#  taxa=names(new_issweep_p_df_unmerged_2_CRC_list)[s]
+#  sweeps=new_issweep_p_df_unmerged_2_CRC_list[[taxa]]$sweep
+#  sweep_list=lapply(sweeps,function(x) data.frame(V1=newtotalsweep_unmerged_list_2[[taxa]][[x]]$sample_id))
+#  names(sweep_list)=sweeps
+#  sweep_list=merge_sweeps(sweep_list,list())
+#  new_issweep_p_df_unmerged_2_CRC_list_1[[s]]=new_issweep_p_df_unmerged_2_CRC_list[[s]]%>% filter(sweep %in% names(sweep_list))
+#}
+#new_issweep_p_df_unmerged_2_CRC=bind_rows(new_issweep_p_df_unmerged_2_CRC_list_1)
+
+#filter for commensals
+new_issweep_p_df_unmerged_2_CRC=new_issweep_p_df_unmerged_2_CRC %>% 
+  mutate(class=case_when(SGB %in% SGB_class$pathogen ~ 'pathogens',
+                         SGB %in% SGB_class$probiotics ~ 'probiotics',
+                         TRUE ~ 'commensals'))
+new_issweep_p_df_unmerged_2_CRC=new_issweep_p_df_unmerged_2_CRC %>% 
+  filter(class=='commensals')
+
+
+new_issweep_list_unmerged_2_CRC=list()
+new_issweep_geo_p_unmerged_2_CRC=list()
+for (s in 1:nrow(new_issweep_p_df_unmerged_2_CRC)){
+  taxa=new_issweep_p_df_unmerged_2_CRC$SGB[s]
+  sweep=new_issweep_p_df_unmerged_2_CRC$sweep[s]
+  
+  stt=new_issweep_list_unmerged_2[taxa]
+  sweep_list=stt[[1]][sweep][[1]] %>% filter(issweep=='sweep')
+  new_issweep_list_unmerged_2_CRC[[s]]=sweep_list
+  names(new_issweep_list_unmerged_2_CRC)[s]=paste(taxa,sweep,sep='-')
+  # is sweep dominated by a country, and also check sweep direction (enrich for CRC or no)
+  observed_freq <- table(sweep_list$country)
+  if (length(observed_freq)>1){
+    new_issweep_geo_p_unmerged_2_CRC[[s]]=c(chisq.test(observed_freq)$p.value,new_issweep_p_df_unmerged_2_CRC$coef[s]<0)  #here needs to be <0 because the correlation is for non-CRC
+  }else{
+    new_issweep_geo_p_unmerged_2_CRC[[s]]=c(0,new_issweep_p_df_unmerged_2_CRC$coef[s]<0) #here needs to be <0 because the correlation is for non-CRC
+  }
+  names(new_issweep_geo_p_unmerged_2_CRC)[s]=paste(taxa,sweep,sep='-')
+}
+
+new_issweep_geo_p_unmerged_2_CRC_df=as.data.frame(t(bind_rows(new_issweep_geo_p_unmerged_2_CRC,.id='id')))
+names(new_issweep_geo_p_unmerged_2_CRC_df)=c('geo_enriched','CRC_enriched')
+new_issweep_geo_p_unmerged_2_CRC_df=new_issweep_geo_p_unmerged_2_CRC_df %>%
+  mutate(geo_enriched=case_when(geo_enriched<=0.05 ~ TRUE, TRUE ~ FALSE))
+new_issweep_geo_p_unmerged_2_CRC_df=new_issweep_geo_p_unmerged_2_CRC_df %>%
+  mutate(CRC_enriched=case_when(CRC_enriched=='1' ~ 'enriched', TRUE ~ 'depleted'))
+
+new_issweep_geo_p_unmerged_2_CRC_df_nogeo=new_issweep_geo_p_unmerged_2_CRC_df %>%
+  filter(geo_enriched==FALSE) %>% select(CRC_enriched)
+names(new_issweep_geo_p_unmerged_2_CRC_df_nogeo)='CRC_sweep_NONGEO'
+write.csv(newtotalsweep_merged_list_2$s__Bacteroides_caccae_SGB1877 %>% count(id),'bc_dist_new.csv')
+
+```
+
+```{r}
+colors=c('#4393C3','#D6604D')
+p1_CRC=Heatmap(new_issweep_geo_p_unmerged_2_CRC_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
+png('non_geo_sweeps_reg_CRC_vs_non_cleaned_0.05.png',width=1800,height=3000,res=300)
+print(p1_CRC)
+dev.off()
+```
+
+
+#CRC age merge
+```{r}
+new_issweep_geo_p_unmerged_comb=merge(new_issweep_geo_p_unmerged_1_age_df_nogeo,
+                                                      new_issweep_geo_p_unmerged_2_CRC_df_nogeo,
+                                                      by=0,all=T)
+new_issweep_geo_p_unmerged_comb$SGB=sapply(strsplit(new_issweep_geo_p_unmerged_comb$Row.names,split = '-'),'[[',1)
+
+new_issweep_geo_p_unmerged_comb_dircount=new_issweep_geo_p_unmerged_comb %>% group_by(SGB) %>% 
+  summarize(unique_age = n_distinct(age_sweep_NONGEO,na.rm=T),unique_CRC=n_distinct(CRC_sweep_NONGEO,na.rm=T))
+
+oppo_SGB=new_issweep_geo_p_unmerged_comb_dircount %>% filter(unique_age>1|unique_CRC>1)
+new_issweep_geo_p_unmerged_comb_filter=new_issweep_geo_p_unmerged_comb %>% filter(SGB %in% oppo_SGB$SGB) 
+new_issweep_geo_p_unmerged_comb_filter$Row.names=rownames(new_issweep_geo_p_unmerged_comb_filter)
+new_issweep_geo_p_unmerged_comb_filter$Row.names=NULL
+names(new_issweep_geo_p_unmerged_comb_filter)=c('age','CRC','SGB')
+new_issweep_geo_p_unmerged_comb_filter_1=new_issweep_geo_p_unmerged_comb_filter[,c(1:2)]
+
+
+colors2=c('#4393C3','#D6604D','white')
+col_mapping <- c("enriched" = '#D6604D', "depleted" = "#4393C3")
+p2=Heatmap(new_issweep_geo_p_unmerged_comb_filter_1,col=col_mapping,na_col = "white",
+           column_gap = unit(5, "mm"),
+           column_split=factor(c('age','CRC')),
+           rect_gp = gpar(col = "grey60", lwd = 1),
+           row_split = factor(new_issweep_geo_p_unmerged_comb_filter$SGB),
+           show_row_names = F,
+           row_title_rot = 0)
+
+png('non_geo_sweeps_reg_CRC_age_bidirectional_cleaned_0.05.png',width=1800,height=2000,res=300)
+print(p2)
+dev.off()
+
+```
+#IBD metadata sweep merge
+```{r}
+#in this step all isolates are removed, since we only merge with MG metadata,
+
+newtotalsweep_merged_list_3=lapply(newtotalsweep_merged_list,function(x)
+  merge(baseline_data_IBD,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,id,disease,age,age_category,country,family,non_westernized,antibiotics_current_use))
+
+newtotalsweep_merged_list_3=lapply(newtotalsweep_merged_list_3,function(x)
+  x %>% 
+#    mutate(family= ifelse(is.na(family),subject_id, family)) %>%
+#    filter(!(age_category %in% c('newborn','child','schoolage'))) %>%
+    group_by(id,family) %>% slice(1) %>% ungroup() %>% group_by(id) %>% 
+    filter(n()>2) %>% ungroup())
+
+newtotalsweep_merged_list_3=Filter(function(x) nrow(x) > 0, newtotalsweep_merged_list_3)
+
+newtotalstrain_list_3=newtotalstrain_list[names(newtotalsweep_merged_list_3)]
+
+newtotalstrain_list_3=lapply(newtotalstrain_list_3,function(x)
+  merge(baseline_data_IBD,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,disease,disease_subtype,age,age_category,country,family, non_westernized,antibiotics_current_use))
+#  %>%filter(antibiotics_current_use=='no') %>%
+#  mutate(disease=case_when(disease=='IBD'~'IBD', TRUE ~ 'non-IBD')))
+
+newtotalstrain_list_3=mapply(function (x,y) x %>%
+  group_by(family) %>%
+  group_modify(~ {
+    if (any(.x$sample_id %in% y$sample_id)) {
+      .x %>% filter(sample_id %in% y$sample_id) %>% slice_sample(n = 1)
+    } else {
+      .x %>% slice_sample(n = 1)
+    }
+  }) %>%
+  ungroup(),
+  newtotalstrain_list_3,
+  newtotalsweep_merged_list_3,
+  SIMPLIFY = F
+)
+```
+
+# IBD associations
+```{r,warning=FALSE}
+newtotalsweep_unmerged_list_3=lapply(newtotalsweep_merged_list_3,
+                                     function(x) split(x,f=x$id))
+new_issweep_list_unmerged_3=mapply(function(x,y) 
+  lapply(x,function(z) y=y %>% mutate(issweep=case_when(sample_id %in% z$sample_id ~ 'sweep', TRUE~ 'notsweep'))),
+  newtotalsweep_unmerged_list_3,newtotalstrain_list_3,SIMPLIFY = F)
+
+
+
+
+new_issweep_p_unmerged_3=list()
+new_issweep_R2_unmerged_3=list()
+
+#i=17 (for B.frag)
+
+for (i in 1:length(new_issweep_list_unmerged_3)){
+  new_issweep_list_unmerged_3s=lapply(new_issweep_list_unmerged_3[[i]], function(x) x%>% select(disease, issweep))
+  new_issweep_list_unmerged_3s=do.call(cbind,new_issweep_list_unmerged_3s)
+  issweep_names=grepl('issweep',names(new_issweep_list_unmerged_3s))
+  new_issweep_list_unmerged_3s=cbind(new_issweep_list_unmerged_3s[,1],
+                                     new_issweep_list_unmerged_3s[issweep_names])
+  names(new_issweep_list_unmerged_3s)[1]='disease'
+  new_issweep_list_unmerged_3s=new_issweep_list_unmerged_3s %>% select(-where(~ all(. == "notsweep")))
+  new_issweep_list_unmerged_3s=new_issweep_list_unmerged_3s %>% select(-where(~ all(. == "sweep")))
+  new_issweep_list_unmerged_3s=mutate_if(new_issweep_list_unmerged_3s, is.character, as.factor)
+  if (ncol(new_issweep_list_unmerged_3s)>1){
+    new_issweep_list_unmerged_3s_glm=glm(disease~.,
+                                         data=new_issweep_list_unmerged_3s,family='binomial')
+    
+    new_issweep_list_unmerged_3s_glm_null = glm(disease~1,
+                                                data=new_issweep_list_unmerged_3s,family='binomial')
+    
+    scope = list(lower=formula(new_issweep_list_unmerged_3s_glm_null),
+                 upper=formula(new_issweep_list_unmerged_3s_glm))
+    
+    select.fit = SignifReg(new_issweep_list_unmerged_3s_glm_null, scope = scope, direction = "forward", trace = FALSE,adjust.method = "fdr", alpha=0.1)
+    R2=1-(logLik(select.fit) / logLik(new_issweep_list_unmerged_3s_glm_null))
+    new_issweep_R2_unmerged_3[[i]]=R2
+    
+    new_issweep_tab_unmerged_3=lapply(new_issweep_list_unmerged_3[[i]], function(x) x%>% count(issweep,disease) %>% spread(disease,n,fill = 0))
+    new_issweep_tab_unmerged_3=lapply(new_issweep_tab_unmerged_3, function(x) x%>% 
+                                        select(-issweep))
+    
+    df_psweep=as.data.frame(select.fit$coefficients)
+    df_psweep$sweep=row.names(df_psweep)
+    rownames(df_psweep)=NULL
+    names(df_psweep)[1]='coef'
+    df_psweep$p.value=select.fit$steps.info$max_pvalue
+    df_psweep$sweep=gsub('.issweepsweep','',df_psweep$sweep)
+    df_psweep=df_psweep %>% filter(!is.na(p.value))
+    if (nrow(df_psweep)>=1){
+      for (s in 1:nrow(df_psweep)){
+        ss=df_psweep$sweep[s]
+        df_psweep$fp.value[s]=fisher.test(new_issweep_tab_unmerged_3[ss][[1]])$p.value
+      }
+      df_psweep$p.adjust=p.adjust(df_psweep$fp.value,method='fdr')
+    }
+  }else{
+    df_psweep=data.frame(coef=0,sweep=NA,p.value=NA,fp.value=NA,p.adjust=NA)
+  }
+  
+  new_issweep_p_unmerged_3[[i]]=df_psweep
+}
+
+names(new_issweep_p_unmerged_3)=names(new_issweep_list_unmerged_3)
+new_issweep_p_df_unmerged_3=bind_rows(new_issweep_p_unmerged_3,.id='SGB')
+new_issweep_p_df_unmerged_3=new_issweep_p_df_unmerged_3 %>% filter(!is.na(p.value))
+IBD_list=new_issweep_p_df_unmerged_3$p.value<0.05
+new_issweep_p_df_unmerged_3_IBD=new_issweep_p_df_unmerged_3[IBD_list,]
+
+#filter for commensals
+new_issweep_p_df_unmerged_3_IBD=new_issweep_p_df_unmerged_3_IBD %>% 
+  mutate(class=case_when(SGB %in% SGB_class$pathogen ~ 'pathogens',
+                         SGB %in% SGB_class$probiotics ~ 'probiotics',
+                         TRUE ~ 'commensals'))
+new_issweep_p_df_unmerged_3_IBD=new_issweep_p_df_unmerged_3_IBD %>% 
+  filter(class=='commensals')
+
+
+new_issweep_list_unmerged_3_IBD=list()
+new_issweep_geo_p_unmerged_3_IBD=list()
+for (s in 1:nrow(new_issweep_p_df_unmerged_3_IBD)){
+  taxa=new_issweep_p_df_unmerged_3_IBD$SGB[s]
+  sweep=new_issweep_p_df_unmerged_3_IBD$sweep[s]
+  
+  stt=new_issweep_list_unmerged_3[taxa]
+  sweep_list=stt[[1]][sweep][[1]] %>% filter(issweep=='sweep')
+  new_issweep_list_unmerged_3_IBD[[s]]=sweep_list
+  names(new_issweep_list_unmerged_3_IBD)[s]=paste(taxa,sweep,sep='-')
+  # is sweep dominated by a country, and also check sweep direction (enrich for IBD or no)
+  observed_freq <- table(sweep_list$country)
+  if (length(observed_freq)>1){
+    new_issweep_geo_p_unmerged_3_IBD[[s]]=c(chisq.test(observed_freq)$p.value,new_issweep_p_df_unmerged_3_IBD$coef[s]<0)  #here needs to be <0 because the correlation is for non-IBD
+  }else{
+    new_issweep_geo_p_unmerged_3_IBD[[s]]=c(0,new_issweep_p_df_unmerged_3_IBD$coef[s]<0) 
+  }
+  names(new_issweep_geo_p_unmerged_3_IBD)[s]=paste(taxa,sweep,sep='-')
+}
+
+new_issweep_geo_p_unmerged_3_IBD_df=as.data.frame(t(bind_rows(new_issweep_geo_p_unmerged_3_IBD,.id='id')))
+names(new_issweep_geo_p_unmerged_3_IBD_df)=c('geo_enriched','IBD_enriched')
+new_issweep_geo_p_unmerged_3_IBD_df=new_issweep_geo_p_unmerged_3_IBD_df %>%
+  mutate(geo_enriched=case_when(geo_enriched<0.05 ~ TRUE, TRUE ~ FALSE))
+new_issweep_geo_p_unmerged_3_IBD_df=new_issweep_geo_p_unmerged_3_IBD_df %>%
+  mutate(IBD_enriched=case_when(IBD_enriched=='1' ~ 'enriched', TRUE ~ 'depleted'))
+
+new_issweep_geo_p_unmerged_3_IBD_df_nogeo=new_issweep_geo_p_unmerged_3_IBD_df %>%
+  filter(geo_enriched==FALSE) %>% select(IBD_enriched)
+names(new_issweep_geo_p_unmerged_3_IBD_df_nogeo)='IBD_sweep_NONGEO'
+
+
+```
+
+```{r}
+colors=c('#4393C3','#D6604D')
+p1_IBD=Heatmap(new_issweep_geo_p_unmerged_3_IBD_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
+png('non_geo_sweeps_reg_IBD_vs_non_clean_0.05.png',width=2000,height=4500,res=300)
+print(p1_IBD)
+dev.off()
+```
+
+#CD metadata sweep merge
+```{r}
+#in this step all isolates are removed, since we only merge with MG metadata,
+#this is for CD
+newtotalsweep_merged_list_3a=lapply(newtotalsweep_merged_list,function(x)
+  merge(baseline_data_CD,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,id,disease,disease_subtype,age,age_category,country,family,non_westernized,antibiotics_current_use))
+
+newtotalsweep_merged_list_3a=lapply(newtotalsweep_merged_list_3a,function(x)
+  x %>% 
+ #   mutate(family= ifelse(is.na(family),subject_id, family)) %>%
+ #   filter(!(age_category %in% c('newborn','child','schoolage'))) %>%
+    group_by(id,family) %>% slice(1) %>% ungroup() %>% group_by(id) %>% 
+    filter(n()>2) %>% ungroup())
+
+newtotalsweep_merged_list_3a=Filter(function(x) nrow(x) > 0, newtotalsweep_merged_list_3a)
+
+
+newtotalstrain_list_3a=newtotalstrain_list[names(newtotalsweep_merged_list_3a)]
+
+newtotalstrain_list_3a=lapply(newtotalstrain_list_3a,function(x)
+  merge(baseline_data_CD,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,disease,disease_subtype,age,age_category,country,family,non_westernized,antibiotics_current_use))
+
+
+newtotalstrain_list_3a=mapply(function (x,y) x %>%
+  group_by(family) %>%
+  group_modify(~ {
+    if (any(.x$sample_id %in% y$sample_id)) {
+      .x %>% filter(sample_id %in% y$sample_id) %>% slice_sample(n = 1)
+    } else {
+      .x %>% slice_sample(n = 1)
+    }
+  }) %>%
+  ungroup(),
+  newtotalstrain_list_3a,
+  newtotalsweep_merged_list_3a,
+  SIMPLIFY = F
+)
+
+
+```
+
+
+## CD associations
+```{r,warning=FALSE}
+# CD
+newtotalsweep_unmerged_list_3a=lapply(newtotalsweep_merged_list_3a,
+                                     function(x) split(x,f=x$id))
+new_issweep_list_unmerged_3a=mapply(function(x,y) 
+  lapply(x,function(z) y=y %>% mutate(issweep=case_when(sample_id %in% z$sample_id ~ 'sweep', TRUE~ 'notsweep'))),
+  newtotalsweep_unmerged_list_3a,newtotalstrain_list_3a,SIMPLIFY = F)
+
+
+new_issweep_p_unmerged_3a=list()
+new_issweep_R2_unmerged_3a=list()
+
+#i=17 (for B.frag)
+
+for (i in 1:length(new_issweep_list_unmerged_3a)){
+  new_issweep_list_unmerged_3as=lapply(new_issweep_list_unmerged_3a[[i]], function(x) x%>% select(disease, issweep))
+  new_issweep_list_unmerged_3as=do.call(cbind,new_issweep_list_unmerged_3as)
+  issweep_names=grepl('issweep',names(new_issweep_list_unmerged_3as))
+  new_issweep_list_unmerged_3as=cbind(new_issweep_list_unmerged_3as[,1],
+                                     new_issweep_list_unmerged_3as[issweep_names])
+  names(new_issweep_list_unmerged_3as)[1]='disease'
+  new_issweep_list_unmerged_3as=new_issweep_list_unmerged_3as %>% select(-where(~ all(. == "notsweep")))
+  new_issweep_list_unmerged_3as=new_issweep_list_unmerged_3as %>% select(-where(~ all(. == "sweep")))
+  new_issweep_list_unmerged_3as=mutate_if(new_issweep_list_unmerged_3as, is.character, as.factor)
+  if (ncol(new_issweep_list_unmerged_3as)>1){
+    new_issweep_list_unmerged_3as_glm=glm(disease~.,
+                                         data=new_issweep_list_unmerged_3as,family='binomial')
+    
+    new_issweep_list_unmerged_3as_glm_null = glm(disease~1,
+                                                data=new_issweep_list_unmerged_3as,family='binomial')
+    
+    scope = list(lower=formula(new_issweep_list_unmerged_3as_glm_null),
+                 upper=formula(new_issweep_list_unmerged_3as_glm))
+    
+    select.fit = SignifReg(new_issweep_list_unmerged_3as_glm_null, scope = scope, direction = "forward", trace = FALSE,adjust.method = "fdr",alpha=0.1)
+    R2=1-(logLik(select.fit) / logLik(new_issweep_list_unmerged_3as_glm_null))
+    new_issweep_R2_unmerged_3a[[i]]=R2
+    
+    new_issweep_tab_unmerged_3a=lapply(new_issweep_list_unmerged_3a[[i]], function(x) x%>% count(issweep,disease) %>% spread(disease,n,fill = 0))
+    new_issweep_tab_unmerged_3a=lapply(new_issweep_tab_unmerged_3a, function(x) x%>% 
+                                        select(-issweep))
+    
+    df_psweep=as.data.frame(select.fit$coefficients)
+    df_psweep$sweep=row.names(df_psweep)
+    rownames(df_psweep)=NULL
+    names(df_psweep)[1]='coef'
+    df_psweep$p.value=select.fit$steps.info$max_pvalue
+    df_psweep$sweep=gsub('.issweepsweep','',df_psweep$sweep)
+    df_psweep=df_psweep %>% filter(!is.na(p.value))
+    if (nrow(df_psweep)>=1){
+      for (s in 1:nrow(df_psweep)){
+        ss=df_psweep$sweep[s]
+        df_psweep$fp.value[s]=fisher.test(new_issweep_tab_unmerged_3a[ss][[1]])$p.value
+      }
+      df_psweep$p.adjust=p.adjust(df_psweep$fp.value,method='fdr')
+    }
+  }else{
+    df_psweep=data.frame(coef=0,sweep=NA,p.value=NA,fp.value=NA,p.adjust=NA)
+  }
+  
+  new_issweep_p_unmerged_3a[[i]]=df_psweep
+}
+
+names(new_issweep_p_unmerged_3a)=names(new_issweep_list_unmerged_3a)
+new_issweep_p_df_unmerged_3a=bind_rows(new_issweep_p_unmerged_3a,.id='SGB')
+new_issweep_p_df_unmerged_3a=new_issweep_p_df_unmerged_3a %>% filter(!is.na(p.value))
+CD_list=new_issweep_p_df_unmerged_3a$p.value<0.05
+new_issweep_p_df_unmerged_3a_CD=new_issweep_p_df_unmerged_3a[CD_list,]
+
+#filter for commensals
+new_issweep_p_df_unmerged_3a_CD=new_issweep_p_df_unmerged_3a_CD %>% 
+  mutate(class=case_when(SGB %in% SGB_class$pathogen ~ 'pathogens',
+                         SGB %in% SGB_class$probiotics ~ 'probiotics',
+                         TRUE ~ 'commensals'))
+new_issweep_p_df_unmerged_3a_CD=new_issweep_p_df_unmerged_3a_CD %>% 
+  filter(class=='commensals')
+
+
+new_issweep_list_unmerged_3a_CD=list()
+new_issweep_geo_p_unmerged_3a_CD=list()
+for (s in 1:nrow(new_issweep_p_df_unmerged_3a_CD)){
+  taxa=new_issweep_p_df_unmerged_3a_CD$SGB[s]
+  sweep=new_issweep_p_df_unmerged_3a_CD$sweep[s]
+  
+  stt=new_issweep_list_unmerged_3a[taxa]
+  sweep_list=stt[[1]][sweep][[1]] %>% filter(issweep=='sweep')
+  new_issweep_list_unmerged_3a_CD[[s]]=sweep_list
+  names(new_issweep_list_unmerged_3a_CD)[s]=paste(taxa,sweep,sep='-')
+  # is sweep dominated by a country, and also check sweep direction (enrich for CD or no)
+  observed_freq <- table(sweep_list$country)
+  if (length(observed_freq)>1){
+    new_issweep_geo_p_unmerged_3a_CD[[s]]=c(chisq.test(observed_freq)$p.value,new_issweep_p_df_unmerged_3a_CD$coef[s]<0)  #here needs to be <0 because the correlation is for non-CD
+  }else{
+    new_issweep_geo_p_unmerged_3a_CD[[s]]=c(0,new_issweep_p_df_unmerged_3a_CD$coef[s]<0) #here needs to be <0 because the correlation is for non-CD
+  }
+  names(new_issweep_geo_p_unmerged_3a_CD)[s]=paste(taxa,sweep,sep='-')
+}
+
+new_issweep_geo_p_unmerged_3a_CD_df=as.data.frame(t(bind_rows(new_issweep_geo_p_unmerged_3a_CD,.id='id')))
+names(new_issweep_geo_p_unmerged_3a_CD_df)=c('geo_enriched','CD_enriched')
+new_issweep_geo_p_unmerged_3a_CD_df=new_issweep_geo_p_unmerged_3a_CD_df %>%
+  mutate(geo_enriched=case_when(geo_enriched<=0.05 ~ TRUE, TRUE ~ FALSE))
+new_issweep_geo_p_unmerged_3a_CD_df=new_issweep_geo_p_unmerged_3a_CD_df %>%
+  mutate(CD_enriched=case_when(CD_enriched=='1' ~ 'enriched', TRUE ~ 'depleted'))
+
+new_issweep_geo_p_unmerged_3a_CD_df_nogeo=new_issweep_geo_p_unmerged_3a_CD_df %>%
+  filter(geo_enriched==FALSE) %>% select(CD_enriched)
+names(new_issweep_geo_p_unmerged_3a_CD_df_nogeo)='CD_sweep_NONGEO'
+
+
+```
+
+```{r}
+colors=c('#4393C3','#D6604D')
+p1_CD=Heatmap(new_issweep_geo_p_unmerged_3a_CD_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
+png('non_geo_sweeps_reg_CD_vs_non_clean_0.05.png',width=2000,height=5000,res=300)
+print(p1_CD)
+dev.off()
+
+
+```
+## UC metadata sweep merge
+
+```{r}
+#this is for UC
+
+newtotalsweep_merged_list_3b=lapply(newtotalsweep_merged_list,function(x)
+  merge(baseline_data_UC,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,id,disease,disease_subtype,age,age_category,country,family,non_westernized,antibiotics_current_use))
+
+newtotalsweep_merged_list_3b=lapply(newtotalsweep_merged_list_3b,function(x)
+  x %>% 
+#    mutate(family= ifelse(is.na(family),subject_id, family)) %>%
+#    filter(!(age_category %in% c('newborn','child','schoolage'))) %>%
+    group_by(id,family) %>% slice(1) %>% ungroup() %>% group_by(id) %>% 
+    filter(n()>2) %>% ungroup())
+
+newtotalsweep_merged_list_3b=Filter(function(x) nrow(x) > 0, newtotalsweep_merged_list_3b)
+
+newtotalstrain_list_3b=newtotalstrain_list[names(newtotalsweep_merged_list_3b)]
+
+newtotalstrain_list_3b=lapply(newtotalstrain_list_3b,function(x)
+  merge(baseline_data_UC,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,disease,disease_subtype,age,age_category,country,family,non_westernized,antibiotics_current_use)) 
+# %>%  filter(antibiotics_current_use=='no') %>%
+#    mutate(disease=case_when(disease_subtype=='CD'~'CD',disease_subtype=='UC'~'UC', TRUE ~ 'non-UC')) %>%
+#    filter(disease!='CD'))
+
+newtotalstrain_list_3b=mapply(function (x,y) x %>%
+  group_by(family) %>%
+  group_modify(~ {
+    if (any(.x$sample_id %in% y$sample_id)) {
+      .x %>% filter(sample_id %in% y$sample_id) %>% slice_sample(n = 1)
+    } else {
+      .x %>% slice_sample(n = 1)
+    }
+  }) %>%
+  ungroup(),
+  newtotalstrain_list_3b,
+  newtotalsweep_merged_list_3b,
+  SIMPLIFY = F
+)
+
+```
+
+# UC association
+```{r,warning=F}
+# UC
+newtotalsweep_unmerged_list_3b=lapply(newtotalsweep_merged_list_3b,
+                                      function(x) split(x,f=x$id))
+new_issweep_list_unmerged_3b=mapply(function(x,y) 
+  lapply(x,function(z) y=y %>% mutate(issweep=case_when(sample_id %in% z$sample_id ~ 'sweep', TRUE~ 'notsweep'))),
+  newtotalsweep_unmerged_list_3b,newtotalstrain_list_3b,SIMPLIFY = F)
+
+new_issweep_p_unmerged_3b=list()
+new_issweep_R2_unmerged_3b=list()
+
+#i=17 (for B.frag)
+
+for (i in 1:length(new_issweep_list_unmerged_3b)){
+  new_issweep_list_unmerged_3bs=lapply(new_issweep_list_unmerged_3b[[i]], function(x) x%>% select(disease, issweep))
+  new_issweep_list_unmerged_3bs=do.call(cbind,new_issweep_list_unmerged_3bs)
+  issweep_names=grepl('issweep',names(new_issweep_list_unmerged_3bs))
+  new_issweep_list_unmerged_3bs=cbind(new_issweep_list_unmerged_3bs[,1],
+                                      new_issweep_list_unmerged_3bs[issweep_names])
+  names(new_issweep_list_unmerged_3bs)[1]='disease'
+  new_issweep_list_unmerged_3bs=new_issweep_list_unmerged_3bs %>% select(-where(~ all(. == "notsweep")))
+  new_issweep_list_unmerged_3bs=new_issweep_list_unmerged_3bs %>% select(-where(~ all(. == "sweep")))
+  new_issweep_list_unmerged_3bs=mutate_if(new_issweep_list_unmerged_3bs, is.character, as.factor)
+  if (ncol(new_issweep_list_unmerged_3bs)>1){
+    new_issweep_list_unmerged_3bs_glm=glm(disease~.,
+                                          data=new_issweep_list_unmerged_3bs,family='binomial')
+    
+    new_issweep_list_unmerged_3bs_glm_null = glm(disease~1,
+                                                 data=new_issweep_list_unmerged_3bs,family='binomial')
+    
+    scope = list(lower=formula(new_issweep_list_unmerged_3bs_glm_null),
+                 upper=formula(new_issweep_list_unmerged_3bs_glm))
+    
+    select.fit = SignifReg(new_issweep_list_unmerged_3bs_glm_null, scope = scope, direction = "forward", trace = FALSE,adjust.method = "fdr",alpha=0.1)
+    R2=1-(logLik(select.fit) / logLik(new_issweep_list_unmerged_3bs_glm_null))
+    new_issweep_R2_unmerged_3b[[i]]=R2
+    
+    new_issweep_tab_unmerged_3b=lapply(new_issweep_list_unmerged_3b[[i]], function(x) x%>% count(issweep,disease) %>% spread(disease,n,fill = 0))
+    new_issweep_tab_unmerged_3b=lapply(new_issweep_tab_unmerged_3b, function(x) x%>% 
+                                         select(-issweep))
+    
+    df_psweep=as.data.frame(select.fit$coefficients)
+    df_psweep$sweep=row.names(df_psweep)
+    rownames(df_psweep)=NULL
+    names(df_psweep)[1]='coef'
+    df_psweep$p.value=select.fit$steps.info$max_pvalue
+    df_psweep$sweep=gsub('.issweepsweep','',df_psweep$sweep)
+    df_psweep=df_psweep %>% filter(!is.na(p.value))
+    if (nrow(df_psweep)>=1){
+      for (s in 1:nrow(df_psweep)){
+        ss=df_psweep$sweep[s]
+        df_psweep$fp.value[s]=fisher.test(new_issweep_tab_unmerged_3b[ss][[1]])$p.value
+      }
+      df_psweep$p.adjust=p.adjust(df_psweep$fp.value,method='fdr')
+    }
+  }else{
+    df_psweep=data.frame(coef=0,sweep=NA,p.value=NA,fp.value=NA,p.adjust=NA)
+  }
+  
+  new_issweep_p_unmerged_3b[[i]]=df_psweep
+}
+
+names(new_issweep_p_unmerged_3b)=names(new_issweep_list_unmerged_3b)
+new_issweep_p_df_unmerged_3b=bind_rows(new_issweep_p_unmerged_3b,.id='SGB')
+new_issweep_p_df_unmerged_3b=new_issweep_p_df_unmerged_3b %>% filter(!is.na(p.value))
+UC_list=new_issweep_p_df_unmerged_3b$p.value<0.05
+new_issweep_p_df_unmerged_3b_UC=new_issweep_p_df_unmerged_3b[UC_list,]
+
+#filter for commensals
+new_issweep_p_df_unmerged_3b_UC=new_issweep_p_df_unmerged_3b_UC %>% 
+  mutate(class=case_when(SGB %in% SGB_class$pathogen ~ 'pathogens',
+                         SGB %in% SGB_class$probiotics ~ 'probiotics',
+                         TRUE ~ 'commensals'))
+new_issweep_p_df_unmerged_3b_UC=new_issweep_p_df_unmerged_3b_UC %>% 
+  filter(class=='commensals')
+
+
+new_issweep_list_unmerged_3b_UC=list()
+new_issweep_geo_p_unmerged_3b_UC=list()
+for (s in 1:nrow(new_issweep_p_df_unmerged_3b_UC)){
+  taxa=new_issweep_p_df_unmerged_3b_UC$SGB[s]
+  sweep=new_issweep_p_df_unmerged_3b_UC$sweep[s]
+  
+  stt=new_issweep_list_unmerged_3b[taxa]
+  sweep_list=stt[[1]][sweep][[1]] %>% filter(issweep=='sweep')
+  new_issweep_list_unmerged_3b_UC[[s]]=sweep_list
+  names(new_issweep_list_unmerged_3b_UC)[s]=paste(taxa,sweep,sep='-')
+  # is sweep dominated by a country, and also check sweep direction (enrich for UC or no)
+  observed_freq <- table(sweep_list$country)
+  if (length(observed_freq)>1){
+    new_issweep_geo_p_unmerged_3b_UC[[s]]=c(chisq.test(observed_freq)$p.value,new_issweep_p_df_unmerged_3b_UC$coef[s]>0)  #here needs to be >0 because the correlation is for UC
+  }else{
+    new_issweep_geo_p_unmerged_3b_UC[[s]]=c(0,new_issweep_p_df_unmerged_3b_UC$coef[s]>0) #here needs to be >0 because the correlation is for UC
+  }
+  names(new_issweep_geo_p_unmerged_3b_UC)[s]=paste(taxa,sweep,sep='-')
+}
+
+new_issweep_geo_p_unmerged_3b_UC_df=as.data.frame(t(bind_rows(new_issweep_geo_p_unmerged_3b_UC,.id='id')))
+names(new_issweep_geo_p_unmerged_3b_UC_df)=c('geo_enriched','UC_enriched')
+new_issweep_geo_p_unmerged_3b_UC_df=new_issweep_geo_p_unmerged_3b_UC_df %>%
+  mutate(geo_enriched=case_when(geo_enriched<=0.05 ~ TRUE, TRUE ~ FALSE))
+new_issweep_geo_p_unmerged_3b_UC_df=new_issweep_geo_p_unmerged_3b_UC_df %>%
+  mutate(UC_enriched=case_when(UC_enriched=='1' ~ 'enriched', TRUE ~ 'depleted'))
+
+new_issweep_geo_p_unmerged_3b_UC_df_nogeo=new_issweep_geo_p_unmerged_3b_UC_df %>%
+  filter(geo_enriched==FALSE) %>% select(UC_enriched)
+names(new_issweep_geo_p_unmerged_3b_UC_df_nogeo)='UC_sweep_NONGEO'
+
+
+```
+
+```{r}
+colors=c('#4393C3','#D6604D')
+p1_UC=Heatmap(new_issweep_geo_p_unmerged_3b_UC_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
+png('non_geo_sweeps_reg_UC_vs_non_clean_0.05.png',width=2000,height=5000,res=300)
+print(p1_UC)
+dev.off()
+```
+#merge IBD, UC, CD for contrast between each other
+
+```{r}
+
+new_issweep_geo_p_unmerged_IBD_nogeo_comb <- list(
+                  new_issweep_geo_p_unmerged_3_IBD_df_nogeo, 
+                  new_issweep_geo_p_unmerged_3a_CD_df_nogeo, 
+                  new_issweep_geo_p_unmerged_3b_UC_df_nogeo
+                   ) %>%
+  lapply(rownames_to_column, var = "rowname") %>%
+  reduce(full_join, by = "rowname") %>%
+  column_to_rownames(var = "rowname")
+
+new_issweep_geo_p_unmerged_IBD_nogeo_comb$SGB=sapply(strsplit(rownames(new_issweep_geo_p_unmerged_IBD_nogeo_comb),split = '-'),'[[',1)
+new_issweep_geo_p_unmerged_IBD_nogeo_comb=new_issweep_geo_p_unmerged_IBD_nogeo_comb[order(new_issweep_geo_p_unmerged_IBD_nogeo_comb$SGB), ]
+
+new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs=new_issweep_geo_p_unmerged_IBD_nogeo_comb %>% filter(!is.na(IBD_sweep_NONGEO)) %>% filter(!is.na(CD_sweep_NONGEO)|!is.na(UC_sweep_NONGEO))%>% arrange(CD_sweep_NONGEO)
+
+names(new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs)=c('IBD','CD','UC','SGB')
+new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs_1=new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs[,c(1:3)]
+
+SGB_list=unique(new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs$SGB)
+SGB_list=c("s__Coprococcus_comes_SGB4577","s__Bacteroides_intestinalis_SGB1846",
+           "s__Hungatella_hathewayi_SGB4742","s__Bacteroides_fragilis_SGB1855",
+           "s__Bacteroides_ovatus_SGB1871","s__Bacteroides_xylanisolvens_SGB1867",
+           "s__Bacteroides_stercoris_SGB1830",
+           "s__Bacteroides_uniformis_SGB1836",
+           "s__Bacteroides_eggerthii_SGB1829",
+           "s__Phocaeicola_vulgatus_SGB1814" ,"s__Lacrimispora_celerecrescens_SGB4868")
+
+colors2=c('#4393C3','#D6604D','white')
+#p2_IBDp=Heatmap(new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs_1,col=colors2,na_col = "white",
+#           rect_gp = gpar(col = "grey60", lwd = 1),
+#           row_split = factor(new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs$SGB,levels=SGB_list),
+#           show_row_names = F,
+#           row_title_rot = 0,
+#           column_names_gp = grid::gpar(fontsize = 18),
+#           column_title_rot = 00)
+
+#png('non_geo_sweeps_IBDp_vs_non_compare_clean_0.05.png',width=2500,height=2500,res=300)
+#print(p2_IBDp)
+#dev.off()
+
+new_issweep_geo_p_unmerged_IBD_nogeo_comb_single=new_issweep_geo_p_unmerged_IBD_nogeo_comb %>% filter(rowSums(is.na(.)) == 2)%>% arrange(IBD_sweep_NONGEO,CD_sweep_NONGEO)
+names(new_issweep_geo_p_unmerged_IBD_nogeo_comb_single)=c('IBD','CD','UC','SGB')
+
+
+SGB_list=unique(new_issweep_geo_p_unmerged_IBD_nogeo_comb_single$SGB)
+
+
+new_issweep_geo_p_unmerged_IBD_nogeo_comb_single_1=new_issweep_geo_p_unmerged_IBD_nogeo_comb_single[,c(1:3)]
+
+colors2=c('#4393C3','#D6604D','white')
+p2_IBDs=Heatmap(new_issweep_geo_p_unmerged_IBD_nogeo_comb_single_1,col=colors2,na_col = "white",
+           rect_gp = gpar(col = "grey60", lwd = 1),
+           row_split = factor(new_issweep_geo_p_unmerged_IBD_nogeo_comb_single$SGB,levels=SGB_list),
+           show_row_names = F,
+           row_title_rot = 0,
+           column_names_gp = grid::gpar(fontsize = 18))
+
+png('non_geo_sweeps_IBDs_vs_non_compare_clean_0.05.png',width=2000,height=2500,res=300)
+print(p2_IBDs)
+dev.off()
+
+```
+## T2D metadata sweep merge 
+```{r}
+#this is for T2D
+newtotalsweep_merged_list_4=lapply(newtotalsweep_merged_list,function(x)
+  merge(baseline_data_T2D,x,by.x='sample_id',by.y='V1') %>% select(sample_id,study_name,subject_id,id,disease,disease_subtype,age,age_category,country,family, non_westernized,antibiotics_current_use))
+  
+newtotalsweep_merged_list_4=lapply(newtotalsweep_merged_list_4,function(x)
+  x %>% 
+#    mutate(family= ifelse(is.na(family),subject_id, family)) %>%
+#    filter(!(age_category %in% c('newborn','child','schoolage'))) %>%
+    group_by(id,family) %>% slice(1) %>% ungroup() %>% group_by(id) %>% 
+    filter(n()>2) %>% ungroup())
+
+newtotalsweep_merged_list_4=Filter(function(x) nrow(x) > 0, newtotalsweep_merged_list_4)
+
+# what are all the metagenomes that have this SGB and can be found in the disease subset we are looking at?
+newtotalstrain_list_4=newtotalstrain_list[names(newtotalsweep_merged_list_4)]
+
+newtotalstrain_list_4=lapply(newtotalstrain_list_4,function(x)
+  merge(baseline_data_T2D,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,disease,disease_subtype,age,age_category,country,family, non_westernized,antibiotics_current_use)) 
+
+newtotalstrain_list_4=mapply(function (x,y) x %>%
+  group_by(family) %>%
+  group_modify(~ {
+    if (any(.x$sample_id %in% y$sample_id)) {
+      .x %>% filter(sample_id %in% y$sample_id) %>% slice_sample(n = 1)
+    } else {
+      .x %>% slice_sample(n = 1)
+    }
+  }) %>%
+  ungroup(),
+  newtotalstrain_list_4,
+  newtotalsweep_merged_list_4,
+  SIMPLIFY = F
+)
+
+```
+
+## T2D associations
+
+```{r}
+
+newtotalsweep_unmerged_list_4=lapply(newtotalsweep_merged_list_4,
+                                     function(x) split(x,f=x$id))
+new_issweep_list_unmerged_4=mapply(function(x,y) 
+  lapply(x,function(z) y=y %>% mutate(issweep=case_when(sample_id %in% z$sample_id ~ 'sweep', TRUE~ 'notsweep'))),
+  newtotalsweep_unmerged_list_4,newtotalstrain_list_4,SIMPLIFY = F)
+
+
+new_issweep_p_unmerged_4=list()
+new_issweep_R2_unmerged_4=list()
+
+#i=17 (for B.frag)
+
+for (i in 1:length(new_issweep_list_unmerged_4)){
+  new_issweep_list_unmerged_4s=lapply(new_issweep_list_unmerged_4[[i]], function(x) x%>% select(disease, issweep))
+  new_issweep_list_unmerged_4s=do.call(cbind,new_issweep_list_unmerged_4s)
+  issweep_names=grepl('issweep',names(new_issweep_list_unmerged_4s))
+  new_issweep_list_unmerged_4s=cbind(new_issweep_list_unmerged_4s[,1],
+                                     new_issweep_list_unmerged_4s[issweep_names])
+  names(new_issweep_list_unmerged_4s)[1]='disease'
+  new_issweep_list_unmerged_4s=new_issweep_list_unmerged_4s %>% select(-where(~ all(. == "notsweep")))
+  new_issweep_list_unmerged_4s=new_issweep_list_unmerged_4s %>% select(-where(~ all(. == "sweep")))
+  new_issweep_list_unmerged_4s=mutate_if(new_issweep_list_unmerged_4s, is.character, as.factor)
+  if (ncol(new_issweep_list_unmerged_4s)>1){
+    new_issweep_list_unmerged_4s_glm=glm(disease~.,
+                                         data=new_issweep_list_unmerged_4s,family='binomial')
+    
+    new_issweep_list_unmerged_4s_glm_null = glm(disease~1,
+                                                data=new_issweep_list_unmerged_4s,family='binomial')
+    
+    scope = list(lower=formula(new_issweep_list_unmerged_4s_glm_null),
+                 upper=formula(new_issweep_list_unmerged_4s_glm))
+    
+    select.fit = SignifReg(new_issweep_list_unmerged_4s_glm_null, scope = scope, direction = "forward", trace = FALSE,adjust.method = "fdr",alpha=0.1)
+    R2=1-(logLik(select.fit) / logLik(new_issweep_list_unmerged_4s_glm_null))
+    new_issweep_R2_unmerged_4[[i]]=R2
+    
+    new_issweep_tab_unmerged_4=lapply(new_issweep_list_unmerged_4[[i]], function(x) x%>% count(issweep,disease) %>% spread(disease,n,fill = 0))
+    new_issweep_tab_unmerged_4=lapply(new_issweep_tab_unmerged_4, function(x) x%>% 
+                                        select(-issweep))
+    
+    df_psweep=as.data.frame(select.fit$coefficients)
+    df_psweep$sweep=row.names(df_psweep)
+    rownames(df_psweep)=NULL
+    names(df_psweep)[1]='coef'
+    df_psweep$p.value=select.fit$steps.info$max_pvalue
+    df_psweep$sweep=gsub('.issweepsweep','',df_psweep$sweep)
+    df_psweep=df_psweep %>% filter(!is.na(p.value))
+    if (nrow(df_psweep)>=1){
+      for (s in 1:nrow(df_psweep)){
+        ss=df_psweep$sweep[s]
+        df_psweep$fp.value[s]=fisher.test(new_issweep_tab_unmerged_4[ss][[1]])$p.value
+      }
+      df_psweep$p.adjust=p.adjust(df_psweep$fp.value,method='fdr')
+    }
+  }else{
+    df_psweep=data.frame(coef=0,sweep=NA,p.value=NA,fp.value=NA,p.adjust=NA)
+  }
+  
+  new_issweep_p_unmerged_4[[i]]=df_psweep
+}
+
+names(new_issweep_p_unmerged_4)=names(new_issweep_list_unmerged_4)
+new_issweep_p_df_unmerged_4=bind_rows(new_issweep_p_unmerged_4,.id='SGB')
+new_issweep_p_df_unmerged_4=new_issweep_p_df_unmerged_4 %>% filter(!is.na(p.value))
+T2D_list=new_issweep_p_df_unmerged_4$p.value<0.05
+new_issweep_p_df_unmerged_4_T2D=new_issweep_p_df_unmerged_4[T2D_list,]
+
+#filter for commensals
+new_issweep_p_df_unmerged_4_T2D=new_issweep_p_df_unmerged_4_T2D %>% 
+  mutate(class=case_when(SGB %in% SGB_class$pathogen ~ 'pathogens',
+                         SGB %in% SGB_class$probiotics ~ 'probiotics',
+                         TRUE ~ 'commensals'))
+new_issweep_p_df_unmerged_4_T2D=new_issweep_p_df_unmerged_4_T2D %>% 
+  filter(class=='commensals')
+
+
+new_issweep_list_unmerged_4_T2D=list()
+new_issweep_geo_p_unmerged_4_T2D=list()
+for (s in 1:nrow(new_issweep_p_df_unmerged_4_T2D)){
+  taxa=new_issweep_p_df_unmerged_4_T2D$SGB[s]
+  sweep=new_issweep_p_df_unmerged_4_T2D$sweep[s]
+  
+  stt=new_issweep_list_unmerged_4[taxa]
+  sweep_list=stt[[1]][sweep][[1]] %>% filter(issweep=='sweep')
+  new_issweep_list_unmerged_4_T2D[[s]]=sweep_list
+  names(new_issweep_list_unmerged_4_T2D)[s]=paste(taxa,sweep,sep='-')
+  # is sweep dominated by a country, and also check sweep direction (enrich for T2D or no)
+  observed_freq <- table(sweep_list$country)
+  if (length(observed_freq)>1){
+    new_issweep_geo_p_unmerged_4_T2D[[s]]=c(chisq.test(observed_freq)$p.value,new_issweep_p_df_unmerged_4_T2D$coef[s]>0)  #here needs to be >0 because the correlation is for T2D
+  }else{
+    new_issweep_geo_p_unmerged_4_T2D[[s]]=c(0,new_issweep_p_df_unmerged_4_T2D$coef[s]>0) 
+  }
+  names(new_issweep_geo_p_unmerged_4_T2D)[s]=paste(taxa,sweep,sep='-')
+}
+
+new_issweep_geo_p_unmerged_4_T2D_df=as.data.frame(t(bind_rows(new_issweep_geo_p_unmerged_4_T2D,.id='id')))
+names(new_issweep_geo_p_unmerged_4_T2D_df)=c('geo_enriched','T2D_enriched')
+new_issweep_geo_p_unmerged_4_T2D_df=new_issweep_geo_p_unmerged_4_T2D_df %>%
+  mutate(geo_enriched=case_when(geo_enriched<=0.05 ~ TRUE, TRUE ~ FALSE))
+new_issweep_geo_p_unmerged_4_T2D_df=new_issweep_geo_p_unmerged_4_T2D_df %>%
+  mutate(T2D_enriched=case_when(T2D_enriched=='1' ~ 'enriched', TRUE ~ 'depleted'))
+
+new_issweep_geo_p_unmerged_4_T2D_df_nogeo=new_issweep_geo_p_unmerged_4_T2D_df %>%
+  filter(geo_enriched==FALSE) %>% select(T2D_enriched)
+names(new_issweep_geo_p_unmerged_4_T2D_df_nogeo)='T2D_sweep_NONGEO'
+
+```
+
+
+```{r}
+colors=c('#4393C3','#D6604D')
+p1_T2D=Heatmap(new_issweep_geo_p_unmerged_4_T2D_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
+png('non_geo_sweeps_reg_T2D_vs_non_clean_0.05.png',width=2000,height=5000,res=300)
+print(p1_T2D)
+dev.off()
+
+```
+
+#merge the data frames with p values
+```{r}
+new_issweep_p_df_unmerged_1$disease='senior'
+new_issweep_p_df_unmerged_2$disease='CRC'
+new_issweep_p_df_unmerged_3a$disease='CD'
+new_issweep_p_df_unmerged_3b$disease='UC'
+new_issweep_p_df_unmerged_4$disease='T2D'
+new_issweep_p_df_unmerged_2$coef=-(new_issweep_p_df_unmerged_2$coef)
+new_issweep_p_df_unmerged_3a$coef=-(new_issweep_p_df_unmerged_3a$coef)
+new_issweep_p_df_unmerged_all=bind_rows(new_issweep_p_df_unmerged_1,new_issweep_p_df_unmerged_2,new_issweep_p_df_unmerged_3a,
+                                        new_issweep_p_df_unmerged_3b,new_issweep_p_df_unmerged_4)
+ new_issweep_p_df_unmerged_all= new_issweep_p_df_unmerged_all%>% 
+  mutate(class=case_when(SGB %in% SGB_class$pathogen ~ 'pathogens',
+                                SGB %in% SGB_class$probiotics ~ 'probiotics',
+                                TRUE ~ 'commensals')) %>% filter(class=='commensals')
+
+new_issweep_p_df_unmerged_all$combined=paste(new_issweep_p_df_unmerged_all$SGB,new_issweep_p_df_unmerged_all$sweep,sep = '-')
+siglist=bind_rows(new_issweep_geo_p_unmerged_1_age_df_nogeo,new_issweep_geo_p_unmerged_2_CRC_df_nogeo,
+                  new_issweep_geo_p_unmerged_3a_CD_df_nogeo,new_issweep_geo_p_unmerged_3b_UC_df_nogeo,new_issweep_geo_p_unmerged_4_T2D_df_nogeo)
+
+geolist=bind_rows(new_issweep_geo_p_unmerged_1_age_df,new_issweep_geo_p_unmerged_2_CRC_df,
+                  new_issweep_geo_p_unmerged_3a_CD_df,new_issweep_geo_p_unmerged_3b_UC_df,new_issweep_geo_p_unmerged_4_T2D_df) %>% filter(geo_enriched=='TRUE')
+
+new_issweep_p_df_unmerged_all=new_issweep_p_df_unmerged_all %>% mutate(association=case_when((combined %in% rownames(siglist) & p.value<0.05 & coef > 0) ~ 'positive',                                                                                              (combined %in% rownames(geolist) & p.value<0.05 & coef > 0) ~ 'positive (regional)',
+(combined %in% rownames(siglist) & p.value<0.05 & coef < 0) ~ 'negative', (combined %in% rownames(geolist) & p.value<0.05 & coef < 0) ~ 'negative (regional)', TRUE ~ 'not significant'))
+
+#new_issweep_p_df_unmerged_all=new_issweep_p_df_unmerged_all %>% mutate(disease=case_when(disease=="advanced age (65+)" ~ "advanced age", TRUE ~ disease))
+
+new_issweep_p_df_unmerged_all$disease=gsub("senior", 'advanced age', new_issweep_p_df_unmerged_all$disease)
+pv=ggplot(data = new_issweep_p_df_unmerged_all, aes(x = coef, y = -log10(p.value),shape=disease,col=association)) +
+         geom_point(size=2)+theme_bw()+scale_color_manual(values = c('#2171b5','#bdd7e7','grey80','#900000','#ffb09c'),name='Association')+
+  scale_shape_manual(values = c(15,2,19,4,17),name='Host state')+
+  theme(legend.position = "bottom")+
+   guides(shape = guide_legend(nrow = 5, byrow = TRUE,title.position = "top"),
+          color=guide_legend(nrow = 5, byrow = TRUE,title.position = "top"))+xlab('Coefficent')+
+  theme(text = element_text(size = 16))
+
+png('volcano_diseases.png',res=300,width=1200,height = 1600)
+pv
+dev.off()
+
+#find sweeps that are positively associated with disease and also have high coefficient
+
+new_issweep_p_df_unmerged_all_ps=new_issweep_p_df_unmerged_all %>% filter(association=='positive')
+
+#plot these significant sweeps so we can visualize the enrichment
+all_datasets_combined=read.csv('all_datasets_combined.csv')
+newtotalsweep_merged_list_all=lapply(newtotalsweep_merged_list,function(x)
+  merge(all_datasets_combined,x,by.x='sample_id',by.y='V1') %>% select(sample_id,subject_id,id,disease,disease_subtype,age,age_category,country,family,non_westernized,antibiotics_current_use))
+
+#this step makes family either family or subject id, so then if we slice for family,
+#we end up slicing for both subject and family
+newtotalsweep_merged_list_all=lapply(newtotalsweep_merged_list_all,function(x)
+  x %>% mutate(family= ifelse(is.na(family),subject_id, family)) %>%
+#    filter(!(age_category %in% c('newborn','child','schoolage'))) %>%
+#    filter(disease=='healthy') %>%    #test what happens if I only consider old age and no disease
+#    filter(antibiotics_current_use=='no') %>%
+    group_by(id,family) %>% slice(1) %>% ungroup() %>% group_by(id) %>% 
+    filter(n()>2) %>% ungroup())
+
+newtotalsweep_merged_list_all=Filter(function(x) nrow(x) > 0, newtotalsweep_merged_list_all)
+
+newtotalsweep_merged_list_all_SGBs=bind_rows(newtotalsweep_merged_list_all,.id='SGB')
+newtotalsweep_merged_list_all_SGBs$combined=paste(newtotalsweep_merged_list_all_SGBs$SGB,newtotalsweep_merged_list_all_SGBs$id,sep='-')
+
+newtotalsweep_merged_list_all_SGBs_select=merge(newtotalsweep_merged_list_all_SGBs,new_issweep_p_df_unmerged_all_ps,by='combined')   #so disease.x is the actual disease the sample is associated with, while disease.y is the "disease habitat" 
+
+newtotalsweep_merged_list_all_SGBs_n=newtotalsweep_merged_list_all_SGBs %>% group_by(SGB) %>% count(disease) 
+
+
+newtotalsweep_merged_list_all_SGBs_select_n=newtotalsweep_merged_list_all_SGBs_select %>% group_by(SGB.x,id,combined,disease.y) %>% count(id, disease.x) %>% ungroup()  
+
+sgb_lookup <- newtotalsweep_merged_list_all_SGBs_select_n %>%
+  distinct(SGB.x,id,combined,disease.y)
+newtotalsweep_merged_list_all_SGBs_select_n = newtotalsweep_merged_list_all_SGBs_select_n %>% complete(combined,disease.x, fill = list(n = 0)) %>%
+  select(combined,n,disease.x) %>% left_join(sgb_lookup,by='combined') %>% left_join(newtotalsweep_merged_list_all_SGBs_n, by = c("SGB.x" = "SGB", "disease.x" = "disease")) %>% mutate(n_norm=n.x/n.y)   #nnorm normalizes against the distribution of disease in each sweep against the disease distribution in all sweeps in the entire SGB 
+
+# Group and collapse
+
+newtotalsweep_merged_list_all_SGBs_select_n=newtotalsweep_merged_list_all_SGBs_select_n %>%
+  group_by(SGB.x,id) %>%
+  mutate(diseases= paste(unique(disease.y), collapse = ","),
+    disease_sweep = paste0(diseases,' (',id,')'))  %>%
+  ungroup() 
+
+
+newtotalsweep_merged_list_all_SGBs_select_n$disease_sweep=gsub('newsweep','sweep',newtotalsweep_merged_list_all_SGBs_select_n$disease_sweep)
+
+#disease_cols <- c("grey90", brewer.pal(length(unique(newtotalsweep_merged_list_all_SGBs_select_n$disease.x)),'Paired'))
+disease_cols=c('grey90',wes_palette('Rushmore1',2), wes_palette('Darjeeling2', length(unique(newtotalsweep_merged_list_all_SGBs_select_n$disease.x)),type='continuous'))
+disease_cols=disease_cols[c(1,3,6,7,5,8)]
+
+disease_match=c("non-target"=disease_cols[1],"CRC"=disease_cols[2],'T2D'=disease_cols[3],'senior'=disease_cols[4],'CD'=disease_cols[5],'UC'=disease_cols[6])
+
+newtotalsweep_merged_list_all_SGBs_select_n <- newtotalsweep_merged_list_all_SGBs_select_n %>%
+  mutate(disease_sweep_colored = disease_sweep)
+disease_labels=newtotalsweep_merged_list_all_SGBs_select_n$disease_sweep_colored
+for (term in names(disease_match)) {
+  disease_labels <- str_replace_all(
+    disease_labels,
+    fixed(term),  # fixed match, not regex
+    paste0("<span style='color:", disease_match[[term]], ";'>", term, "</span>")
+  )
+}
+
+newtotalsweep_merged_list_all_SGBs_select_n$disease_sweep_colored=disease_labels
+
+# Plot
+newtotalsweep_merged_list_all_SGBs_select_n$disease_sweep=as.factor(newtotalsweep_merged_list_all_SGBs_select_n$disease_sweep)
+newtotalsweep_merged_list_all_SGBs_select_n= newtotalsweep_merged_list_all_SGBs_select_n %>% group_by(SGB.x) %>%
+  arrange(disease_sweep) %>% ungroup() 
+
+newtotalsweep_merged_list_all_SGBs_select_n$disease.x=gsub('senior','advanced age',newtotalsweep_merged_list_all_SGBs_select_n$disease.x)
+newtotalsweep_merged_list_all_SGBs_select_n$disease.x <- factor(newtotalsweep_merged_list_all_SGBs_select_n$disease.x, 
+                                                                levels = c("non-target", "CRC", "T2D","advanced age","CD","UC"))
+newtotalsweep_merged_list_all_SGBs_select_n_habitat=newtotalsweep_merged_list_all_SGBs_select_n %>% group_by(combined) %>% slice(1)
+#newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease_sweep=factor(newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease_sweep,
+#                                                                        levels=c("age (65+)","CRC","T2D",'CD','UC'))
+#newtotalsweep_merged_list_all_SGBs_select_n$disease_sweep=factor(newtotalsweep_merged_list_all_SGBs_select_n$disease_sweep,
+#                                                                        levels=c("age (65+)","CRC","T2D",'CD','UC'))
+
+# habitat_total=ggplot(newtotalsweep_merged_list_all_SGBs_select_n, aes(x = disease.y, y = n_norm, fill = disease.x)) +
+#   facet_wrap(~SGB.x,scales = "free_y", drop = TRUE)+
+#   geom_bar(position = "fill",stat = "identity") +
+#   scale_fill_manual(values=disease_cols)+
+#   scale_y_continuous(expand = c(0,0),labels = scales::percent_format()) +
+#  # scale_x_discrete(labels = newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease.y)+
+#   theme_minimal(base_size = 14) +
+#   labs(
+#     x    = "Associated host state",
+#     y    = "% samples in sweep",
+#     fill = "Disease"
+#   )+ coord_flip()
+
+newtotalsweep_merged_list_all_SGBs_select_n$facet_label=gsub('s__', '*', newtotalsweep_merged_list_all_SGBs_select_n$SGB.x)
+newtotalsweep_merged_list_all_SGBs_select_n$facet_label=gsub('_', ' ', newtotalsweep_merged_list_all_SGBs_select_n$facet_label)
+newtotalsweep_merged_list_all_SGBs_select_n$facet_label=gsub(' SGB','*<br> (SGB',newtotalsweep_merged_list_all_SGBs_select_n$facet_label)
+newtotalsweep_merged_list_all_SGBs_select_n$facet_label=paste0(newtotalsweep_merged_list_all_SGBs_select_n$facet_label,')')
+
+habitat_total_2=ggplot(newtotalsweep_merged_list_all_SGBs_select_n, aes(y = disease_sweep_colored, x = n_norm, fill = disease.x)) +
+  facet_wrap(~facet_label,scales = "free_y", drop = TRUE,ncol=3)+
+  geom_bar(position = "fill",stat = "identity") +
+  scale_fill_manual(values=disease_cols)+
+  scale_x_continuous(expand = c(0,0),labels = scales::percent_format()) +
+   theme_minimal() +
+  theme(axis.text.y = ggtext::element_markdown(size = 12),
+        axis.text.x = element_text(size = 12),
+        strip.text = ggtext::element_markdown(size = 12),
+        axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16))+
+  labs(
+    y    = "Associated host state",
+    x    = "% samples in sweep",
+    fill = "Host state"
+  )
+
+# png('habitat_total.png',res=300,width = 6000,height = 3000)
+# habitat_total
+# dev.off()
+
+png('habitat_total_sweep.png',res=300,width = 4500,height = 4000)
+habitat_total_2
+dev.off()
+
+newtotalsweep_merged_list_all_SGBs_select_n_BU=newtotalsweep_merged_list_all_SGBs_select_n %>% filter(SGB.x=='s__Bacteroides_uniformis_SGB1836') 
+newtotalsweep_merged_list_all_SGBs_select_n_BC=newtotalsweep_merged_list_all_SGBs_select_n %>% filter(SGB.x=='s__Bacteroides_caccae_SGB1877') 
+
+
+newtotalsweep_merged_list_all_SGBs_select_n_BU$disease.x <- factor(newtotalsweep_merged_list_all_SGBs_select_n_BU$disease.x, 
+                                                                levels = c("non-target", "CRC", "T2D","advanced age","CD","UC"))
+# newtotalsweep_merged_list_all_SGBs_select_n_BU_habitat=newtotalsweep_merged_list_all_SGBs_select_n_BU %>% group_by(combined) %>% slice(1)
+# newtotalsweep_merged_list_all_SGBs_select_n_BU_habitat$disease.y=factor(newtotalsweep_merged_list_all_SGBs_select_n_BU_habitat$disease.y,
+#                                                                         levels=c("age (65+)","CRC","T2D",'CD','UC'))
+# 
+# newtotalsweep_merged_list_all_SGBs_select_n_BU$disease.y=factor(newtotalsweep_merged_list_all_SGBs_select_n_BU$disease.y,
+#                                                                         levels=c("age (65+)","CRC","T2D",'CD','UC'))
+
+# habitat_BU=ggplot(newtotalsweep_merged_list_all_SGBs_select_n_BU, aes(x = disease.y, y = n_norm, fill = disease.x)) +
+#   facet_wrap(~SGB.x,scales = "free_x", drop = TRUE)+
+#   geom_bar(position = "fill",stat = "identity") +
+#   scale_fill_manual(values=disease_cols)+
+#   scale_y_continuous(expand = c(0,0),labels = scales::percent_format()) +
+#  # scale_x_discrete(labels = newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease.y)+
+#   theme_minimal(base_size = 14) +
+#   labs(
+#     x    = "Associated host state",
+#     y    = "% samples in sweep",
+#     fill = "Disease"
+#   )+ 
+#   coord_flip()
+# 
+# png('habitat_BU.png',res=300,width = 2000,height = 1000)
+# habitat_BU
+# dev.off()
+newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep_colored=as.factor(newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep_colored)
+#newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep=factor(newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep,levels=                  #                                                    levels(newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep)[c(1,4:9,2:3,10:12)])
+
+newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label=gsub('s__', '*', newtotalsweep_merged_list_all_SGBs_select_n_BU$SGB.x)
+newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label=gsub('_', ' ', newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label)
+newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label=gsub(' SGB','* (SGB',newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label)
+newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label=paste0(newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label,')')
+
+habitat_BU_2=ggplot(newtotalsweep_merged_list_all_SGBs_select_n_BU, aes(y = disease_sweep_colored, x = n_norm, fill = disease.x)) +
+  facet_wrap(~ facet_label,scales = "free_y", drop = TRUE)+
+  geom_bar(position = "fill",stat = "identity") +
+  theme_minimal(base_size = 14) +
+  scale_fill_manual(values=disease_cols)+
+  scale_x_continuous(expand = c(0,0),labels = scales::percent_format()) +
+  theme(axis.text.y = ggtext::element_markdown(size = 14),
+        strip.text = ggtext::element_markdown(size = 14))+
+ # scale_x_discrete(labels = newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease.y)+
+  labs(
+    y    = "Associated host state",
+    x    = "% samples in sweep",
+    fill = "Host state"
+  )
+
+
+
+png('habitat_BU_sweep.png',res=300,width = 2500,height = 1000)
+habitat_BU_2
+dev.off()
+
+newtotalsweep_merged_list_all_SGBs_select_n_BC$disease.x <- factor(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease.x, 
+                                                                levels = c("non-target", "CRC", "T2D","advanced age","CD","UC"))
+# newtotalsweep_merged_list_all_SGBs_select_n_BC_habitat=newtotalsweep_merged_list_all_SGBs_select_n_BC %>% group_by(combined) %>% slice(1)
+# newtotalsweep_merged_list_all_SGBs_select_n_BC_habitat$disease.y=factor(newtotalsweep_merged_list_all_SGBs_select_n_BC_habitat$disease.y,
+#                                                                         levels=c("age (65+)","CRC","T2D",'CD','UC'))
+# 
+# newtotalsweep_merged_list_all_SGBs_select_n_BC$disease.y=factor(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease.y,
+#                                                                         levels=c("age (65+)","CRC","T2D",'CD','UC'))
+# newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep=as.factor(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep)
+# newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep=factor(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep,levels = levels(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep)[c(1,3:4,2,5:7)])
+
+# habitat_BC=ggplot(newtotalsweep_merged_list_all_SGBs_select_n_BC, aes(x = disease.y, y = n_norm, fill = disease.x)) +
+#   facet_wrap(~SGB.x,scales = "free_x", drop = TRUE)+
+#   geom_bar(position = "fill",stat = "identity") +
+#   scale_fill_manual(values=disease_cols)+
+#   scale_y_continuous(expand = c(0,0),labels = scales::percent_format()) +
+#  # scale_x_discrete(labels = newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease.y)+
+#   theme_minimal(base_size = 14) +
+#   labs(
+#     x    = "Associated host state",
+#     y    = "% samples in sweep",
+#     fill = "Disease"
+#   )+ coord_flip()
+# 
+# png('habitat_BC.png',res=300,width = 2000,height = 1000)
+# habitat_BC
+# dev.off()
+
+habitat_BC_2=ggplot(newtotalsweep_merged_list_all_SGBs_select_n_BC, aes(x = disease_sweep, y = n_norm, fill = disease.x)) +
+  facet_wrap(~SGB.x,scales = "free_x", drop = TRUE)+
+  geom_bar(position = "fill",stat = "identity") +
+  scale_fill_manual(values=disease_cols)+
+  scale_y_continuous(expand = c(0,0),labels = scales::percent_format()) +
+ # scale_x_discrete(labels = newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease.y)+
+  theme_minimal(base_size = 14) +
+  labs(
+    x    = "Associated host state",
+    y    = "% samples in sweep",
+    fill = "Disease"
+  )+ coord_flip()
+
+png('habitat_BC_sweep.png',res=300,width = 2000,height = 1000)
+habitat_BC_2
+dev.off()
+
+
+```
+
+#age,CRC,IBD,T2D merge
+
+```{r}
+new_issweep_geo_p_unmerged_nogeo_comb <- list(new_issweep_geo_p_unmerged_1_age_df_nogeo, 
+                                              new_issweep_geo_p_unmerged_4_T2D_df_nogeo,
+                  new_issweep_geo_p_unmerged_2_CRC_df_nogeo, 
+                  new_issweep_geo_p_unmerged_3_IBD_df_nogeo
+                   ) %>%
+  lapply(rownames_to_column, var = "rowname") %>%
+  reduce(full_join, by = "rowname") %>%
+  column_to_rownames(var = "rowname")
+
+new_issweep_geo_p_unmerged_nogeo_comb$SGB=sapply(strsplit(rownames(new_issweep_geo_p_unmerged_nogeo_comb),split = '-'),'[[',1)
+
+new_issweep_geo_p_unmerged_nogeo_comb_dircount=new_issweep_geo_p_unmerged_nogeo_comb %>% group_by(SGB) %>% 
+  summarize(unique_age = n_distinct(age_sweep_NONGEO,na.rm=T),unique_CRC=n_distinct(CRC_sweep_NONGEO,na.rm=T),
+            unique_IBD = n_distinct(IBD_sweep_NONGEO,na.rm=T),unique_T2D=n_distinct(IBD_sweep_NONGEO,na.rm=T))
+
+          
+oppo_SGB=new_issweep_geo_p_unmerged_nogeo_comb_dircount %>% filter(unique_age>1|unique_CRC>1|unique_IBD>1|unique_T2D>1)
+new_issweep_geo_p_unmerged_nogeo_comb_oppo=new_issweep_geo_p_unmerged_nogeo_comb %>% filter(SGB %in% oppo_SGB$SGB) 
+
+names(new_issweep_geo_p_unmerged_nogeo_comb_oppo)=c('age','T2D','CRC','IBD','SGB')
+new_issweep_geo_p_unmerged_nogeo_comb_oppo_1=new_issweep_geo_p_unmerged_nogeo_comb_oppo[,c(1:4)]
+
+write.csv(new_issweep_geo_p_unmerged_nogeo_comb, 'new_issweep_geo_p_unmerged_nogeo_comb_clean_0.05.csv')
+write.csv(new_issweep_geo_p_unmerged_nogeo_comb_oppo, 'new_issweep_geo_p_unmerged_nogeo_comb_oppo_clean_0.05.csv')
+
+colors2=c('#4393C3','#D6604D','white')
+col_mapping <- c("enriched" = '#D6604D', "depleted" = "#4393C3")
+p2=Heatmap(new_issweep_geo_p_unmerged_nogeo_comb_oppo_1,col=col_mapping,na_col = "white",
+           column_gap = unit(5, "mm"),
+           column_split=c('age','T2D','CRC','IBD'),
+           rect_gp = gpar(col = "grey60", lwd = 1),
+           row_split = factor(new_issweep_geo_p_unmerged_nogeo_comb_oppo$SGB),
+           show_row_names = F,
+           row_title_rot = 0)
+
+png('non_geo_sweeps_reg_all_bidirectional_clean_0.05.png',width=2000,height=1500,res=300)
+print(p2)
+dev.off()
+
+new_issweep_geo_p_unmerged_nogeo_comb_2cond=new_issweep_geo_p_unmerged_nogeo_comb %>% filter(rowSums(is.na(.)) <= 2)
+names(new_issweep_geo_p_unmerged_nogeo_comb_2cond)=c('age','T2D','CRC','IBD','SGB')
+new_issweep_geo_p_unmerged_nogeo_comb_2cond_1=new_issweep_geo_p_unmerged_nogeo_comb_2cond[,c(1:4)]
+
+colors2=c('#4393C3','#D6604D','white')
+col_mapping <- c("enriched" = '#D6604D', "depleted" = "#4393C3")
+p2=Heatmap(new_issweep_geo_p_unmerged_nogeo_comb_2cond_1,col=col_mapping,na_col = "white",
+           column_gap = unit(5, "mm"),
+           column_split=c('age','T2D','CRC','IBD'),
+           rect_gp = gpar(col = "grey60", lwd = 1),
+           row_split = factor(new_issweep_geo_p_unmerged_nogeo_comb_2cond$SGB),
+           show_row_names = F,
+           row_title_rot = 0)
+
+png('non_geo_sweeps_reg_all_2cond_clean_0.05.png',width=2000,height=1500,res=300)
+print(p2)
+dev.off()
+
+
+```
+
+
+# associate sweep - isolate match
+```{r}
+
+#check how much associated sweeps may overlap with isolate based sweeps
+new_issweep_geo_p_unmerged_nogeo_comb6 <- list(new_issweep_geo_p_unmerged_1_age_df_nogeo, 
+                                              new_issweep_geo_p_unmerged_4_T2D_df_nogeo,
+                  new_issweep_geo_p_unmerged_2_CRC_df_nogeo, 
+   
+                  new_issweep_geo_p_unmerged_3a_CD_df_nogeo,
+                  new_issweep_geo_p_unmerged_3b_UC_df_nogeo
+                   ) %>%
+  lapply(rownames_to_column, var = "rowname") %>%
+  reduce(full_join, by = "rowname") %>%
+  column_to_rownames(var = "rowname")
+
+
+associated_sweeps=row.names(new_issweep_geo_p_unmerged_nogeo_comb6)
+associated_sweeps_strains=list()
+for (s in 1:length(associated_sweeps)){
+  st=strsplit(associated_sweeps[s],split='-')[[1]][1]
+  ss=strsplit(associated_sweeps[s],split='-')[[1]][2]
+  associated_sweeps_strains[[s]]=as.data.frame(newtotalsweep_list[st][[1]][ss])
+}
+names(associated_sweeps_strains)=associated_sweeps
+
+associated_sweeps_strains_all=bind_rows(associated_sweeps_strains,.id = 'newsweep')
+
+#read in isolate based sweeps
+isolate_sweeps_table=Sys.glob('../../instrain/confirmed_select_lists/*.txt')
+
+isolate_sweeps_list=lapply(isolate_sweeps_table, function(x) read.table(x))
+names(isolate_sweeps_list)=unlist(lapply(isolate_sweeps_table,function(x) gsub('../../instrain/confirmed_select_lists/','',x)))
+names(isolate_sweeps_list)=gsub('_consensus_sweep.txt','',names(isolate_sweeps_list))
+isolate_sweeps_all=bind_rows(isolate_sweeps_list,.id='sweep')
+isolate_sweeps_isolate_only=isolate_sweeps_all %>% filter(V1 %in% metadata_isolate$Strain)
+associated_sweeps_strains_overlap=merge(associated_sweeps_strains_all,isolate_sweeps_isolate_only,by='V1') %>% arrange(newsweep)
+associated_sweeps_strains_overlap=merge(associated_sweeps_strains_overlap,new_issweep_geo_p_unmerged_nogeo_comb6,by.x='newsweep',by.y=0)
+
+associated_sweeps_strains_overlap_list=split(associated_sweeps_strains_overlap,f=associated_sweeps_strains_overlap$newsweep)
+for (i in 1:length(associated_sweeps_strains_overlap_list)){
+  s=unique(associated_sweeps_strains_overlap_list[[i]]$sweep)
+  ni=sum(isolate_sweeps_isolate_only$sweep==s)
+  r=nrow(associated_sweeps_strains_overlap_list[[i]])/ni
+  associated_sweeps_strains_overlap_list[[i]]$newsweepinsweep=r
+}
+
+associated_sweeps_strains_overlap=bind_rows(associated_sweeps_strains_overlap_list)
+
+write.csv(associated_sweeps_strains_overlap,'associated_sweeps_strains_overlap.csv',row.names = F)
+
+select_sweeps=associated_sweeps_strains_overlap %>% filter(newsweepinsweep>0.5) %>% select(sweep) %>% unique()
+select_sweeps$sweep=gsub('diffH','',select_sweeps$sweep)
+select_sweeps$enrichment=c('UC_enriched_but_seperated','CRC enriched','UC enriched','CD depleted','UC_depleted','CD depleted',
+                           
+                           'CD_enriched','CD_UC_enriched','UC_enriched','CD_enriched')
+
+unique_genes=read.csv('../../functional_analysis_by_SGB/sweep_differentiating_genes_clean.csv')
+positive_genes=read.csv('../../functional_analysis_by_SGB/genes_under_positive_selection.csv')
+positive_genes$sweep=sapply(strsplit(positive_genes$query,split='_consensus'),'[[',1)
+positive_genes$sweep=gsub('diffH','',positive_genes$sweep)
+unique_genes_select=merge(unique_genes,select_sweeps,by.x='Sweep',by.y='sweep')
+positive_genes_select=merge(positive_genes,select_sweeps,by='sweep')
+write.csv(unique_genes_select,'associated_sweeps_unique_genes.csv',row.names = F)
+write.csv(positive_genes_select,'associated_sweeps_positive_genes.csv',row.names = F)
+
+```
+
+
+##merge with SGB correlations
+
+```{r}
+#read in SGB correlations and sweep correlations
+age_CRC_IBD_T2D_merged_df=read.csv('age_CRC_IBD_T2D_merged_df.csv',row.names = 1)
+new_issweep_geo_p_unmerged_nogeo_comb=read.csv('new_issweep_geo_p_unmerged_nogeo_comb.csv',row.names = 1)
+
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1=merge(new_issweep_geo_p_unmerged_nogeo_comb,age_CRC_IBD_T2D_merged_df,by.x='SGB',by.y=0, all.x=T)
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1$SGB=gsub('s__','',new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1$SGB)
+
+
+```
+##age
+```{r}
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1 %>%
+  select("SGB","age","Seniority")
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$Seniority=as.factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$Seniority)
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age_m=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age %>% select("age")
+  
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB=gsub('_',' ',new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB)
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB1=sapply(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB, function(x) {
+  parts <- strsplit(x, "SGB")[[1]]
+  parts[[2]]=paste0("(SGB",parts[[2]],")")
+  paste0(parts[[1]],parts[[2]])
+})
+SGB_list=unique(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB1)
+SGB_list=SGB_list[c(1:3,5,4)]
+
+#new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age_m=apply(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_m,2,as.factor)
+#new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age_m=as.matrix(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_m)
+
+ha=rowAnnotation(SGB=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$Seniority,
+                 col=list(SGB=c("enriched" = "#D6604D", 
+                                "depleted" = "#4393C3")),
+                 annotation_name_gp = gpar(fontsize = 16),
+                 na_col = "grey90")
+
+p2a=Heatmap(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age_m,col=colors2,na_col = "grey90",
+           rect_gp = gpar(col = "grey60", lwd = 1),
+           column_split = c('age (65+)'),
+           show_row_names = F,
+           show_column_names = FALSE,
+           cluster_column_slices = FALSE,
+           cluster_row_slices = FALSE,
+           row_split = factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB1,
+                              levels=SGB_list),
+           row_gap = unit(10, "mm"),
+           row_names_max_width = unit(12, "cm"),name='Direction',
+           column_names_gp = grid::gpar(fontsize = 18),
+           column_title_gp = grid::gpar(fontsize = 20),
+           row_title_rot = 0,
+           row_names_gp = grid::gpar(fontsize = 18),
+           row_title_gp = grid::gpar(fontsize = 20),
+           left_annotation = ha,
+           heatmap_legend_param = list(labels_gp = grid::gpar(fontsize = 18),
+                                       legend_direction = "horizontal", 
+                                       nrow=1,
+                                       legend_width = unit(0.9, "npc"),
+                                       title_gp = grid::gpar(fontsize = 20)))
+
+png('all_sweeps_reg_age_bidirection.png',width=2800,height=2000,res=300)
+draw(p2a)
+dev.off()
+```
+
+##CRC
+
+```{r}
+
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1 %>%
+  select("SGB","CRC.x","CRC.y")
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$Seniority=as.factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$CRC.y)
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC_m=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC %>% select("CRC.x")
+  
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB=gsub('_',' ',new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB)
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB1=sapply(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB, function(x) {
+  parts <- strsplit(x, "SGB")[[1]]
+  parts[[2]]=paste0("(SGB",parts[[2]],")")
+  paste0(parts[[1]],parts[[2]])
+})
+SGB_list=unique(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB1)
+SGB_list=SGB_list[c(1:3,5,4)]
+
+
+ha=rowAnnotation(SGB=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$CRC.y,
+                 col=list(SGB=c("enriched" = "#D6604D", 
+                                "depleted" = "#4393C3")),
+                 annotation_name_gp = gpar(fontsize = 16),
+                 na_col = "grey90")
+
+p2a=Heatmap(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC_m,col=colors2,na_col = "grey90",
+           rect_gp = gpar(col = "grey60", lwd = 1),
+           column_split = c('CRC'),
+           show_row_names = F,
+           show_column_names = FALSE,
+           cluster_column_slices = FALSE,
+           cluster_row_slices = FALSE,
+           row_split = factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB1,
+                              levels=SGB_list),
+           row_gap = unit(10, "mm"),
+           row_names_max_width = unit(12, "cm"),name='Direction',
+           column_names_gp = grid::gpar(fontsize = 18),
+           column_title_gp = grid::gpar(fontsize = 20),
+           row_title_rot = 0,
+           row_names_gp = grid::gpar(fontsize = 18),
+           row_title_gp = grid::gpar(fontsize = 20),
+           left_annotation = ha,
+           heatmap_legend_param = list(labels_gp = grid::gpar(fontsize = 18),
+                                       legend_direction = "horizontal", 
+                                       nrow=1,
+                                       legend_width = unit(0.9, "npc"),
+                                       title_gp = grid::gpar(fontsize = 20)))
+
+png('all_sweeps_reg_CRC_bidirection.png',width=2800,height=2000,res=300)
+draw(p2a)
+dev.off()
+
+```
+##T2D
+
+```{r}
+
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1 %>%
+  select("SGB","T2D.x","T2D.y")
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$Seniority=as.factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$T2D.y)
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D_m=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D %>% select("T2D.x")
+  
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB=gsub('_',' ',new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB)
+new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB1=sapply(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB, function(x) {
+  parts <- strsplit(x, "SGB")[[1]]
+  parts[[2]]=paste0("(SGB",parts[[2]],")")
+  paste0(parts[[1]],parts[[2]])
+})
+SGB_list=unique(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB1)
+SGB_list=SGB_list[c(1:3,5,4)]
+
+
+ha=rowAnnotation(SGB=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$T2D.y,
+                 col=list(SGB=c("enriched" = "#D6604D","depleted" = "#4393C3"
+                                )),
+                 annotation_name_gp = gpar(fontsize = 16),
+                 na_col = "grey90")
+
+p2a=Heatmap(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D_m,col=colors2[2:3],na_col = "grey90",
+           rect_gp = gpar(col = "grey60", lwd = 1),
+           column_split = c('T2D'),
+           show_row_names = F,
+           show_column_names = FALSE,
+           cluster_column_slices = FALSE,
+           cluster_row_slices = FALSE,
+           row_split = factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB1,
+                              levels=SGB_list),
+           row_gap = unit(10, "mm"),
+           row_names_max_width = unit(12, "cm"),name='Direction',
+           column_names_gp = grid::gpar(fontsize = 18),
+           column_title_gp = grid::gpar(fontsize = 20),
+           row_title_rot = 0,
+           row_names_gp = grid::gpar(fontsize = 18),
+           row_title_gp = grid::gpar(fontsize = 20),
+           left_annotation = ha,
+           heatmap_legend_param = list(labels_gp = grid::gpar(fontsize = 18),
+                                       legend_direction = "horizontal", 
+                                       nrow=1,
+                                       legend_width = unit(0.9, "npc"),
+                                       title_gp = grid::gpar(fontsize = 20)))
+
+png('all_sweeps_reg_T2D_bidirection.png',width=2450,height=2000,res=300)
+draw(p2a)
+dev.off()
+
+```
+
+
+##general enrichment in sweeps
+```{r}
+# first ask if any symptoms are enriched in sweeps for age
+new_issweep_list_1=mapply(function(x,y) y=y %>% mutate(issweep=case_when(sample_id %in% x$sample_id ~ 'sweep', TRUE~ 'notsweep')),
+                          newtotalsweep_merged_list_1,newtotalstrain_list_1,SIMPLIFY = F)
+
+
+new_issweep_p_1=list()
+new_issweep_tab_list_1=list()
+for (i in 1:length(new_issweep_list_1)){
+  new_issweep_tab_1=new_issweep_list_1[[i]] %>% count(issweep,age_category) %>% spread(age_category,n,fill = 0)
+  new_issweep_tab_1= new_issweep_tab_1 %>% 
+    select(-issweep)
+  new_issweep_tab_list_1[[i]]=new_issweep_tab_1
+  if (nrow(new_issweep_tab_1)>1){
+    new_issweep_p_1[[i]]=chisq.test(new_issweep_tab_1)$p.value
+  } else {
+    new_issweep_p_1[[i]]=1
+  }
+}
+
+names(new_issweep_p_1)=names(new_issweep_list_1)
+names(new_issweep_tab_list_1)=names(new_issweep_list_1)
+new_issweep_p_df_1=t(bind_rows(new_issweep_p_1,.id='SGB'))
+new_issweep_p_df_1=as.data.frame(new_issweep_p_df_1)
+new_issweep_p_df_1$p.adj=p.adjust(new_issweep_p_df_1$V1,method = 'fdr')
+age_list=rownames(new_issweep_p_df_1)[new_issweep_p_df_1$p.adj<0.05]
+new_issweep_p_df_1[age_list,]
+```
+
+
+```{r}
+# ask if any symptoms are enriched in sweeps, CRC
+new_issweep_list_2=mapply(function(x,y) y=y %>% mutate(issweep=case_when(sample_id %in% x$sample_id ~ 'sweep', TRUE~ 'notsweep')),
+                          newtotalsweep_merged_list_2,newtotalstrain_list_2,SIMPLIFY = F)
+
+new_issweep_p_2=list()
+new_issweep_tab_list_2=list()
+for (i in 1:length(new_issweep_list_2)){
+  new_issweep_tab_2=new_issweep_list_2[[i]] %>% count(issweep,disease) %>% spread(disease,n,fill = 0)
+  new_issweep_tab_2= new_issweep_tab_2 %>% 
+    select(-issweep)
+  new_issweep_tab_list_2[[i]]=new_issweep_tab_2
+  if (nrow(new_issweep_tab_2)>1){
+    new_issweep_p_2[[i]]=chisq.test(new_issweep_tab_2)$p.value
+  } else {
+    new_issweep_p_2[[i]]=1
+  }
+}
+
+names(new_issweep_p_2)=names(new_issweep_list_2)
+names(new_issweep_tab_list_2)=names(new_issweep_list_2)
+new_issweep_p_df_2=t(bind_rows(new_issweep_p_2,.id='SGB'))
+new_issweep_p_df_2=as.data.frame(new_issweep_p_df_2)
+new_issweep_p_df_2$p.adjust=p.adjust(new_issweep_p_df_2$V1,method='fdr')
+CRC_list=rownames(new_issweep_p_df_2)[new_issweep_p_df_2$p.adjust<0.05]
+new_issweep_p_df_2[CRC_list,]
+
+```
+```{r}
+# ask if any symptoms are enriched in sweeps, IBD
+new_issweep_list_3=mapply(function(x,y) y=y %>% mutate(issweep=case_when(sample_id %in% x$sample_id ~ 'sweep', TRUE~ 'notsweep')),
+                          newtotalsweep_merged_list_3,newtotalstrain_list_3,SIMPLIFY = F)
+
+new_issweep_p_3=list()
+new_issweep_tab_list_3=list()
+for (i in 1:length(new_issweep_list_3)){
+  new_issweep_tab_3=new_issweep_list_3[[i]] %>% count(issweep,disease) %>% spread(disease,n,fill = 0)
+  new_issweep_tab_3= new_issweep_tab_3 %>% 
+    select(-issweep)
+  new_issweep_tab_list_3[[i]]=new_issweep_tab_3
+  if (nrow(new_issweep_tab_3)>1){
+    new_issweep_p_3[[i]]=chisq.test(new_issweep_tab_3)$p.value
+  } else {
+    new_issweep_p_3[[i]]=1
+  }
+}
+
+names(new_issweep_p_3)=names(new_issweep_list_3)
+names(new_issweep_tab_list_3)=names(new_issweep_list_3)
+new_issweep_p_df_3=t(bind_rows(new_issweep_p_3,.id='SGB'))
+new_issweep_p_df_3=as.data.frame(new_issweep_p_df_3)
+new_issweep_p_df_3$p.adjust=p.adjust(new_issweep_p_df_3$V1,method='fdr')
+IBD_list=rownames(new_issweep_p_df_3)[new_issweep_p_df_3$p.adjust<0.05]
+new_issweep_p_df_3[IBD_list,]
+
+```
+```
+
+```{r}
+# ask if any symptoms are enriched in sweeps, T2D
+new_issweep_list_4=mapply(function(x,y) y=y %>% mutate(issweep=case_when(sample_id %in% x$sample_id ~ 'sweep', TRUE~ 'notsweep')),
+                          newtotalsweep_merged_list_4,newtotalstrain_list_4,SIMPLIFY = F)
+
+
+new_issweep_p_4=list()
+new_issweep_tab_list_4=list()
+for (i in 1:length(new_issweep_list_4)){
+  new_issweep_tab_4=new_issweep_list_4[[i]] %>% count(issweep,disease) %>% spread(disease,n,fill = 0)
+  new_issweep_tab_4= new_issweep_tab_4 %>% 
+    select(-issweep)
+  new_issweep_tab_list_4[[i]]=new_issweep_tab_4
+  if (nrow(new_issweep_tab_4)>1){
+    new_issweep_p_4[[i]]=chisq.test(new_issweep_tab_4)$p.value
+  } else {
+    new_issweep_p_4[[i]]=1
+  }
+}
+
+names(new_issweep_p_4)=names(new_issweep_list_4)
+names(new_issweep_tab_list_4)=names(new_issweep_list_4)
+new_issweep_p_df_4=t(bind_rows(new_issweep_p_4,.id='SGB'))
+new_issweep_p_df_4=as.data.frame(new_issweep_p_df_4)
+new_issweep_p_df_4$p.adjust=p.adjust(new_issweep_p_df_4$V1,method='fdr')
+T2D_list=rownames(new_issweep_p_df_4)[new_issweep_p_df_4$p.adjust<0.05]
+new_issweep_p_df_4[T2D_list,]
+
+```
+
+
