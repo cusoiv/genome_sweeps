@@ -1,5 +1,5 @@
 # genome_sweeps
-This is the code repository for all figures in the paper "Genome-wide sweeps create fundamental ecological units in the human gut microbiome"
+**This is the code repository for all figures in the paper "Genome-wide sweeps create fundamental ecological units in the human gut microbiome"**
 
 01_simulations contains all the code to simulate and test for the effective range of the recombination identification algorithm (Extended Data Fig. 2).
 
