@@ -1,0 +1,9 @@
+Rscript Rscripts/0_subset_data.R
+Rscript Rscripts/1_find_unique_prots_across_sweep_clonalframes.R
+Rscript Rscripts/2_find_genes_differentiating_sweeps_from_sisters.R
+Rscript Rscripts/3_test_sweep_specific_orfs.R
+Rscript Rscripts/4a_plot_significant_COG_enrichment_split_out_disease.R
+Rscript Rscripts/4b_plot_significant_pfam_enrichment_split_out_disease.R
+Rscript Rscripts/5a_main_figure_plot.R
+Rscript Rscripts/5b_test_main_figure.R
+Rscript Rscripts/6_supp_figure_plot.R
