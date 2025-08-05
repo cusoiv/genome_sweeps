@@ -1,4 +1,4 @@
-compare_summary_SNP.R calculates the age of each sweep based on (maximum) pairwise distances between samples with 
+**compare_summary_SNP.R** calculates the age of each sweep based on (maximum) pairwise distances between samples with 
 
 1) a molecular clock of 1-10 SNPs per genome per year 
 
