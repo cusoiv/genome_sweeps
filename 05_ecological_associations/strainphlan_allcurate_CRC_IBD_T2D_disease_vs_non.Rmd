@@ -305,15 +305,6 @@ names(new_issweep_geo_p_unmerged_1_age_df_nogeo)='age_sweep_NONGEO'
 ```
 
 
-```{r}
-colors=c('#4393C3','#D6604D')
-p1_age=Heatmap(new_issweep_geo_p_unmerged_1_age_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
-png('non_geo_sweeps_reg_age_cleaned_0.05.png',width=2000,height=2500,res=300)
-print(p1_age)
-dev.off()
-```
-
-
 #CRC metadata sweep merge
 ```{r}
 
@@ -504,18 +495,9 @@ new_issweep_geo_p_unmerged_2_CRC_df=new_issweep_geo_p_unmerged_2_CRC_df %>%
 new_issweep_geo_p_unmerged_2_CRC_df_nogeo=new_issweep_geo_p_unmerged_2_CRC_df %>%
   filter(geo_enriched==FALSE) %>% select(CRC_enriched)
 names(new_issweep_geo_p_unmerged_2_CRC_df_nogeo)='CRC_sweep_NONGEO'
-write.csv(newtotalsweep_merged_list_2$s__Bacteroides_caccae_SGB1877 %>% count(id),'bc_dist_new.csv')
+
 
 ```
-
-```{r}
-colors=c('#4393C3','#D6604D')
-p1_CRC=Heatmap(new_issweep_geo_p_unmerged_2_CRC_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
-png('non_geo_sweeps_reg_CRC_vs_non_cleaned_0.05.png',width=1800,height=3000,res=300)
-print(p1_CRC)
-dev.off()
-```
-
 
 #CRC age merge
 ```{r}
@@ -537,19 +519,9 @@ new_issweep_geo_p_unmerged_comb_filter_1=new_issweep_geo_p_unmerged_comb_filter[
 
 colors2=c('#4393C3','#D6604D','white')
 col_mapping <- c("enriched" = '#D6604D', "depleted" = "#4393C3")
-p2=Heatmap(new_issweep_geo_p_unmerged_comb_filter_1,col=col_mapping,na_col = "white",
-           column_gap = unit(5, "mm"),
-           column_split=factor(c('age','CRC')),
-           rect_gp = gpar(col = "grey60", lwd = 1),
-           row_split = factor(new_issweep_geo_p_unmerged_comb_filter$SGB),
-           show_row_names = F,
-           row_title_rot = 0)
-
-png('non_geo_sweeps_reg_CRC_age_bidirectional_cleaned_0.05.png',width=1800,height=2000,res=300)
-print(p2)
-dev.off()
 
 ```
+
 #IBD metadata sweep merge
 ```{r}
 #in this step all isolates are removed, since we only merge with MG metadata,
@@ -703,13 +675,6 @@ names(new_issweep_geo_p_unmerged_3_IBD_df_nogeo)='IBD_sweep_NONGEO'
 
 ```
 
-```{r}
-colors=c('#4393C3','#D6604D')
-p1_IBD=Heatmap(new_issweep_geo_p_unmerged_3_IBD_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
-png('non_geo_sweeps_reg_IBD_vs_non_clean_0.05.png',width=2000,height=4500,res=300)
-print(p1_IBD)
-dev.off()
-```
 
 #CD metadata sweep merge
 ```{r}
@@ -866,15 +831,7 @@ names(new_issweep_geo_p_unmerged_3a_CD_df_nogeo)='CD_sweep_NONGEO'
 
 ```
 
-```{r}
-colors=c('#4393C3','#D6604D')
-p1_CD=Heatmap(new_issweep_geo_p_unmerged_3a_CD_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
-png('non_geo_sweeps_reg_CD_vs_non_clean_0.05.png',width=2000,height=5000,res=300)
-print(p1_CD)
-dev.off()
 
-
-```
 ## UC metadata sweep merge
 
 ```{r}
@@ -1029,78 +986,7 @@ names(new_issweep_geo_p_unmerged_3b_UC_df_nogeo)='UC_sweep_NONGEO'
 
 ```
 
-```{r}
-colors=c('#4393C3','#D6604D')
-p1_UC=Heatmap(new_issweep_geo_p_unmerged_3b_UC_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
-png('non_geo_sweeps_reg_UC_vs_non_clean_0.05.png',width=2000,height=5000,res=300)
-print(p1_UC)
-dev.off()
-```
-#merge IBD, UC, CD for contrast between each other
 
-```{r}
-
-new_issweep_geo_p_unmerged_IBD_nogeo_comb <- list(
-                  new_issweep_geo_p_unmerged_3_IBD_df_nogeo, 
-                  new_issweep_geo_p_unmerged_3a_CD_df_nogeo, 
-                  new_issweep_geo_p_unmerged_3b_UC_df_nogeo
-                   ) %>%
-  lapply(rownames_to_column, var = "rowname") %>%
-  reduce(full_join, by = "rowname") %>%
-  column_to_rownames(var = "rowname")
-
-new_issweep_geo_p_unmerged_IBD_nogeo_comb$SGB=sapply(strsplit(rownames(new_issweep_geo_p_unmerged_IBD_nogeo_comb),split = '-'),'[[',1)
-new_issweep_geo_p_unmerged_IBD_nogeo_comb=new_issweep_geo_p_unmerged_IBD_nogeo_comb[order(new_issweep_geo_p_unmerged_IBD_nogeo_comb$SGB), ]
-
-new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs=new_issweep_geo_p_unmerged_IBD_nogeo_comb %>% filter(!is.na(IBD_sweep_NONGEO)) %>% filter(!is.na(CD_sweep_NONGEO)|!is.na(UC_sweep_NONGEO))%>% arrange(CD_sweep_NONGEO)
-
-names(new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs)=c('IBD','CD','UC','SGB')
-new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs_1=new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs[,c(1:3)]
-
-SGB_list=unique(new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs$SGB)
-SGB_list=c("s__Coprococcus_comes_SGB4577","s__Bacteroides_intestinalis_SGB1846",
-           "s__Hungatella_hathewayi_SGB4742","s__Bacteroides_fragilis_SGB1855",
-           "s__Bacteroides_ovatus_SGB1871","s__Bacteroides_xylanisolvens_SGB1867",
-           "s__Bacteroides_stercoris_SGB1830",
-           "s__Bacteroides_uniformis_SGB1836",
-           "s__Bacteroides_eggerthii_SGB1829",
-           "s__Phocaeicola_vulgatus_SGB1814" ,"s__Lacrimispora_celerecrescens_SGB4868")
-
-colors2=c('#4393C3','#D6604D','white')
-#p2_IBDp=Heatmap(new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs_1,col=colors2,na_col = "white",
-#           rect_gp = gpar(col = "grey60", lwd = 1),
-#           row_split = factor(new_issweep_geo_p_unmerged_IBD_nogeo_comb_IBDs$SGB,levels=SGB_list),
-#           show_row_names = F,
-#           row_title_rot = 0,
-#           column_names_gp = grid::gpar(fontsize = 18),
-#           column_title_rot = 00)
-
-#png('non_geo_sweeps_IBDp_vs_non_compare_clean_0.05.png',width=2500,height=2500,res=300)
-#print(p2_IBDp)
-#dev.off()
-
-new_issweep_geo_p_unmerged_IBD_nogeo_comb_single=new_issweep_geo_p_unmerged_IBD_nogeo_comb %>% filter(rowSums(is.na(.)) == 2)%>% arrange(IBD_sweep_NONGEO,CD_sweep_NONGEO)
-names(new_issweep_geo_p_unmerged_IBD_nogeo_comb_single)=c('IBD','CD','UC','SGB')
-
-
-SGB_list=unique(new_issweep_geo_p_unmerged_IBD_nogeo_comb_single$SGB)
-
-
-new_issweep_geo_p_unmerged_IBD_nogeo_comb_single_1=new_issweep_geo_p_unmerged_IBD_nogeo_comb_single[,c(1:3)]
-
-colors2=c('#4393C3','#D6604D','white')
-p2_IBDs=Heatmap(new_issweep_geo_p_unmerged_IBD_nogeo_comb_single_1,col=colors2,na_col = "white",
-           rect_gp = gpar(col = "grey60", lwd = 1),
-           row_split = factor(new_issweep_geo_p_unmerged_IBD_nogeo_comb_single$SGB,levels=SGB_list),
-           show_row_names = F,
-           row_title_rot = 0,
-           column_names_gp = grid::gpar(fontsize = 18))
-
-png('non_geo_sweeps_IBDs_vs_non_compare_clean_0.05.png',width=2000,height=2500,res=300)
-print(p2_IBDs)
-dev.off()
-
-```
 ## T2D metadata sweep merge 
 ```{r}
 #this is for T2D
@@ -1141,7 +1027,7 @@ newtotalstrain_list_4=mapply(function (x,y) x %>%
 
 ## T2D associations
 
-```{r}
+```{r,warning=F}
 
 newtotalsweep_unmerged_list_4=lapply(newtotalsweep_merged_list_4,
                                      function(x) split(x,f=x$id))
@@ -1253,53 +1139,61 @@ names(new_issweep_geo_p_unmerged_4_T2D_df_nogeo)='T2D_sweep_NONGEO'
 ```
 
 
-```{r}
-colors=c('#4393C3','#D6604D')
-p1_T2D=Heatmap(new_issweep_geo_p_unmerged_4_T2D_df_nogeo,col=colors,row_names_max_width = unit(12, "cm"))
-png('non_geo_sweeps_reg_T2D_vs_non_clean_0.05.png',width=2000,height=5000,res=300)
-print(p1_T2D)
-dev.off()
-
-```
-
 #merge the data frames with p values
 ```{r}
+new_issweep_p_df_unmerged_2r=new_issweep_p_df_unmerged_2
+new_issweep_p_df_unmerged_3ar=new_issweep_p_df_unmerged_3a
+
+
 new_issweep_p_df_unmerged_1$disease='senior'
 new_issweep_p_df_unmerged_2$disease='CRC'
 new_issweep_p_df_unmerged_3a$disease='CD'
 new_issweep_p_df_unmerged_3b$disease='UC'
 new_issweep_p_df_unmerged_4$disease='T2D'
-new_issweep_p_df_unmerged_2$coef=-(new_issweep_p_df_unmerged_2$coef)
-new_issweep_p_df_unmerged_3a$coef=-(new_issweep_p_df_unmerged_3a$coef)
-new_issweep_p_df_unmerged_all=bind_rows(new_issweep_p_df_unmerged_1,new_issweep_p_df_unmerged_2,new_issweep_p_df_unmerged_3a,
+new_issweep_p_df_unmerged_2r$coef=-(new_issweep_p_df_unmerged_2$coef)
+new_issweep_p_df_unmerged_3ar$coef=-(new_issweep_p_df_unmerged_3a$coef)
+new_issweep_p_df_unmerged_all=bind_rows(new_issweep_p_df_unmerged_1,new_issweep_p_df_unmerged_2r,new_issweep_p_df_unmerged_3ar,
                                         new_issweep_p_df_unmerged_3b,new_issweep_p_df_unmerged_4)
- new_issweep_p_df_unmerged_all= new_issweep_p_df_unmerged_all%>% 
+new_issweep_p_df_unmerged_all= new_issweep_p_df_unmerged_all%>% 
   mutate(class=case_when(SGB %in% SGB_class$pathogen ~ 'pathogens',
                                 SGB %in% SGB_class$probiotics ~ 'probiotics',
                                 TRUE ~ 'commensals')) %>% filter(class=='commensals')
-
 new_issweep_p_df_unmerged_all$combined=paste(new_issweep_p_df_unmerged_all$SGB,new_issweep_p_df_unmerged_all$sweep,sep = '-')
-siglist=bind_rows(new_issweep_geo_p_unmerged_1_age_df_nogeo,new_issweep_geo_p_unmerged_2_CRC_df_nogeo,
+
+siglist_list = list(new_issweep_geo_p_unmerged_1_age_df_nogeo,new_issweep_geo_p_unmerged_2_CRC_df_nogeo,
                   new_issweep_geo_p_unmerged_3a_CD_df_nogeo,new_issweep_geo_p_unmerged_3b_UC_df_nogeo,new_issweep_geo_p_unmerged_4_T2D_df_nogeo)
+siglist_list_1=lapply(siglist_list, function(df) rownames_to_column(df, var = "rowname"))
 
-geolist=bind_rows(new_issweep_geo_p_unmerged_1_age_df,new_issweep_geo_p_unmerged_2_CRC_df,
-                  new_issweep_geo_p_unmerged_3a_CD_df,new_issweep_geo_p_unmerged_3b_UC_df,new_issweep_geo_p_unmerged_4_T2D_df) %>% filter(geo_enriched=='TRUE')
+siglist=bind_rows(siglist_list_1)
 
-new_issweep_p_df_unmerged_all=new_issweep_p_df_unmerged_all %>% mutate(association=case_when((combined %in% rownames(siglist) & p.value<0.05 & coef > 0) ~ 'positive',                                                                                              (combined %in% rownames(geolist) & p.value<0.05 & coef > 0) ~ 'positive (regional)',
-(combined %in% rownames(siglist) & p.value<0.05 & coef < 0) ~ 'negative', (combined %in% rownames(geolist) & p.value<0.05 & coef < 0) ~ 'negative (regional)', TRUE ~ 'not significant'))
+geolist_list=list(new_issweep_geo_p_unmerged_1_age_df,new_issweep_geo_p_unmerged_2_CRC_df,
+                  new_issweep_geo_p_unmerged_3a_CD_df,new_issweep_geo_p_unmerged_3b_UC_df,new_issweep_geo_p_unmerged_4_T2D_df)
+geolist_list_1=lapply(geolist_list, function(df) rownames_to_column(df, var = "rowname"))
+
+geolist=bind_rows(geolist_list_1) %>% filter(geo_enriched=='TRUE')
+
+new_issweep_p_df_unmerged_all=new_issweep_p_df_unmerged_all %>% mutate(association=case_when((combined %in% siglist$rowname & p.value<0.05 & coef > 0) ~ 'positive',                                                                                              (combined %in% geolist$rowname & p.value<0.05 & coef > 0) ~ 'positive (regional)',
+(combined %in% siglist$rowname & p.value<0.05 & coef < 0) ~ 'negative', (combined %in% geolist$rowname & p.value<0.05 & coef < 0) ~ 'negative (regional)', TRUE ~ ' marginal significance'))
 
 #new_issweep_p_df_unmerged_all=new_issweep_p_df_unmerged_all %>% mutate(disease=case_when(disease=="advanced age (65+)" ~ "advanced age", TRUE ~ disease))
 
 new_issweep_p_df_unmerged_all$disease=gsub("senior", 'advanced age', new_issweep_p_df_unmerged_all$disease)
-pv=ggplot(data = new_issweep_p_df_unmerged_all, aes(x = coef, y = -log10(p.value),shape=disease,col=association)) +
-         geom_point(size=2)+theme_bw()+scale_color_manual(values = c('#2171b5','#bdd7e7','grey80','#900000','#ffb09c'),name='Association')+
-  scale_shape_manual(values = c(15,2,19,4,17),name='Host state')+
+new_issweep_p_df_unmerged_all$disease=factor(new_issweep_p_df_unmerged_all$disease,levels=c('CRC','T2D','advanced age','CD','UC'))
+
+
+disease_cols=c('grey90',wes_palette('Rushmore1',2), wes_palette('Darjeeling2', 6,type='continuous'))
+disease_cols=disease_cols[c(1,3,6,7,5,8)]
+
+
+pv=ggplot(data = new_issweep_p_df_unmerged_all, aes(x = coef, y = -log10(p.value),col=disease,shape=association)) +
+         geom_point(size=4)+theme_bw()+scale_color_manual(values =disease_cols[2:6], name='Host State')+
+  scale_shape_manual(values = c('\u25E6','\u25BC','\u25BD','\u25B2','\u25B3'),name='Association')+
   theme(legend.position = "bottom")+
    guides(shape = guide_legend(nrow = 5, byrow = TRUE,title.position = "top"),
           color=guide_legend(nrow = 5, byrow = TRUE,title.position = "top"))+xlab('Coefficent')+
   theme(text = element_text(size = 16))
 
-png('volcano_diseases.png',res=300,width=1200,height = 1600)
+png('volcano_diseases_2.png',res=300,width=1200,height = 1600)
 pv
 dev.off()
 
@@ -1457,7 +1351,6 @@ newtotalsweep_merged_list_all_SGBs_select_n_BU$disease.x <- factor(newtotalsweep
 # habitat_BU
 # dev.off()
 newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep_colored=as.factor(newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep_colored)
-#newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep=factor(newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep,levels=                  #                                                    levels(newtotalsweep_merged_list_all_SGBs_select_n_BU$disease_sweep)[c(1,4:9,2:3,10:12)])
 
 newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label=gsub('s__', '*', newtotalsweep_merged_list_all_SGBs_select_n_BU$SGB.x)
 newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label=gsub('_', ' ', newtotalsweep_merged_list_all_SGBs_select_n_BU$facet_label)
@@ -1485,116 +1378,9 @@ png('habitat_BU_sweep.png',res=300,width = 2500,height = 1000)
 habitat_BU_2
 dev.off()
 
-newtotalsweep_merged_list_all_SGBs_select_n_BC$disease.x <- factor(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease.x, 
-                                                                levels = c("non-target", "CRC", "T2D","advanced age","CD","UC"))
-# newtotalsweep_merged_list_all_SGBs_select_n_BC_habitat=newtotalsweep_merged_list_all_SGBs_select_n_BC %>% group_by(combined) %>% slice(1)
-# newtotalsweep_merged_list_all_SGBs_select_n_BC_habitat$disease.y=factor(newtotalsweep_merged_list_all_SGBs_select_n_BC_habitat$disease.y,
-#                                                                         levels=c("age (65+)","CRC","T2D",'CD','UC'))
-# 
-# newtotalsweep_merged_list_all_SGBs_select_n_BC$disease.y=factor(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease.y,
-#                                                                         levels=c("age (65+)","CRC","T2D",'CD','UC'))
-# newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep=as.factor(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep)
-# newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep=factor(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep,levels = levels(newtotalsweep_merged_list_all_SGBs_select_n_BC$disease_sweep)[c(1,3:4,2,5:7)])
-
-# habitat_BC=ggplot(newtotalsweep_merged_list_all_SGBs_select_n_BC, aes(x = disease.y, y = n_norm, fill = disease.x)) +
-#   facet_wrap(~SGB.x,scales = "free_x", drop = TRUE)+
-#   geom_bar(position = "fill",stat = "identity") +
-#   scale_fill_manual(values=disease_cols)+
-#   scale_y_continuous(expand = c(0,0),labels = scales::percent_format()) +
-#  # scale_x_discrete(labels = newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease.y)+
-#   theme_minimal(base_size = 14) +
-#   labs(
-#     x    = "Associated host state",
-#     y    = "% samples in sweep",
-#     fill = "Disease"
-#   )+ coord_flip()
-# 
-# png('habitat_BC.png',res=300,width = 2000,height = 1000)
-# habitat_BC
-# dev.off()
-
-habitat_BC_2=ggplot(newtotalsweep_merged_list_all_SGBs_select_n_BC, aes(x = disease_sweep, y = n_norm, fill = disease.x)) +
-  facet_wrap(~SGB.x,scales = "free_x", drop = TRUE)+
-  geom_bar(position = "fill",stat = "identity") +
-  scale_fill_manual(values=disease_cols)+
-  scale_y_continuous(expand = c(0,0),labels = scales::percent_format()) +
- # scale_x_discrete(labels = newtotalsweep_merged_list_all_SGBs_select_n_habitat$disease.y)+
-  theme_minimal(base_size = 14) +
-  labs(
-    x    = "Associated host state",
-    y    = "% samples in sweep",
-    fill = "Disease"
-  )+ coord_flip()
-
-png('habitat_BC_sweep.png',res=300,width = 2000,height = 1000)
-habitat_BC_2
-dev.off()
-
 
 ```
 
-#age,CRC,IBD,T2D merge
-
-```{r}
-new_issweep_geo_p_unmerged_nogeo_comb <- list(new_issweep_geo_p_unmerged_1_age_df_nogeo, 
-                                              new_issweep_geo_p_unmerged_4_T2D_df_nogeo,
-                  new_issweep_geo_p_unmerged_2_CRC_df_nogeo, 
-                  new_issweep_geo_p_unmerged_3_IBD_df_nogeo
-                   ) %>%
-  lapply(rownames_to_column, var = "rowname") %>%
-  reduce(full_join, by = "rowname") %>%
-  column_to_rownames(var = "rowname")
-
-new_issweep_geo_p_unmerged_nogeo_comb$SGB=sapply(strsplit(rownames(new_issweep_geo_p_unmerged_nogeo_comb),split = '-'),'[[',1)
-
-new_issweep_geo_p_unmerged_nogeo_comb_dircount=new_issweep_geo_p_unmerged_nogeo_comb %>% group_by(SGB) %>% 
-  summarize(unique_age = n_distinct(age_sweep_NONGEO,na.rm=T),unique_CRC=n_distinct(CRC_sweep_NONGEO,na.rm=T),
-            unique_IBD = n_distinct(IBD_sweep_NONGEO,na.rm=T),unique_T2D=n_distinct(IBD_sweep_NONGEO,na.rm=T))
-
-          
-oppo_SGB=new_issweep_geo_p_unmerged_nogeo_comb_dircount %>% filter(unique_age>1|unique_CRC>1|unique_IBD>1|unique_T2D>1)
-new_issweep_geo_p_unmerged_nogeo_comb_oppo=new_issweep_geo_p_unmerged_nogeo_comb %>% filter(SGB %in% oppo_SGB$SGB) 
-
-names(new_issweep_geo_p_unmerged_nogeo_comb_oppo)=c('age','T2D','CRC','IBD','SGB')
-new_issweep_geo_p_unmerged_nogeo_comb_oppo_1=new_issweep_geo_p_unmerged_nogeo_comb_oppo[,c(1:4)]
-
-write.csv(new_issweep_geo_p_unmerged_nogeo_comb, 'new_issweep_geo_p_unmerged_nogeo_comb_clean_0.05.csv')
-write.csv(new_issweep_geo_p_unmerged_nogeo_comb_oppo, 'new_issweep_geo_p_unmerged_nogeo_comb_oppo_clean_0.05.csv')
-
-colors2=c('#4393C3','#D6604D','white')
-col_mapping <- c("enriched" = '#D6604D', "depleted" = "#4393C3")
-p2=Heatmap(new_issweep_geo_p_unmerged_nogeo_comb_oppo_1,col=col_mapping,na_col = "white",
-           column_gap = unit(5, "mm"),
-           column_split=c('age','T2D','CRC','IBD'),
-           rect_gp = gpar(col = "grey60", lwd = 1),
-           row_split = factor(new_issweep_geo_p_unmerged_nogeo_comb_oppo$SGB),
-           show_row_names = F,
-           row_title_rot = 0)
-
-png('non_geo_sweeps_reg_all_bidirectional_clean_0.05.png',width=2000,height=1500,res=300)
-print(p2)
-dev.off()
-
-new_issweep_geo_p_unmerged_nogeo_comb_2cond=new_issweep_geo_p_unmerged_nogeo_comb %>% filter(rowSums(is.na(.)) <= 2)
-names(new_issweep_geo_p_unmerged_nogeo_comb_2cond)=c('age','T2D','CRC','IBD','SGB')
-new_issweep_geo_p_unmerged_nogeo_comb_2cond_1=new_issweep_geo_p_unmerged_nogeo_comb_2cond[,c(1:4)]
-
-colors2=c('#4393C3','#D6604D','white')
-col_mapping <- c("enriched" = '#D6604D', "depleted" = "#4393C3")
-p2=Heatmap(new_issweep_geo_p_unmerged_nogeo_comb_2cond_1,col=col_mapping,na_col = "white",
-           column_gap = unit(5, "mm"),
-           column_split=c('age','T2D','CRC','IBD'),
-           rect_gp = gpar(col = "grey60", lwd = 1),
-           row_split = factor(new_issweep_geo_p_unmerged_nogeo_comb_2cond$SGB),
-           show_row_names = F,
-           row_title_rot = 0)
-
-png('non_geo_sweeps_reg_all_2cond_clean_0.05.png',width=2000,height=1500,res=300)
-print(p2)
-dev.off()
-
-
-```
 
 
 # associate sweep - isolate match
@@ -1661,299 +1447,6 @@ unique_genes_select=merge(unique_genes,select_sweeps,by.x='Sweep',by.y='sweep')
 positive_genes_select=merge(positive_genes,select_sweeps,by='sweep')
 write.csv(unique_genes_select,'associated_sweeps_unique_genes.csv',row.names = F)
 write.csv(positive_genes_select,'associated_sweeps_positive_genes.csv',row.names = F)
-
-```
-
-
-##merge with SGB correlations
-
-```{r}
-#read in SGB correlations and sweep correlations
-age_CRC_IBD_T2D_merged_df=read.csv('age_CRC_IBD_T2D_merged_df.csv',row.names = 1)
-new_issweep_geo_p_unmerged_nogeo_comb=read.csv('new_issweep_geo_p_unmerged_nogeo_comb.csv',row.names = 1)
-
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1=merge(new_issweep_geo_p_unmerged_nogeo_comb,age_CRC_IBD_T2D_merged_df,by.x='SGB',by.y=0, all.x=T)
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1$SGB=gsub('s__','',new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1$SGB)
-
-
-```
-##age
-```{r}
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1 %>%
-  select("SGB","age","Seniority")
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$Seniority=as.factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$Seniority)
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age_m=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age %>% select("age")
-  
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB=gsub('_',' ',new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB)
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB1=sapply(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB, function(x) {
-  parts <- strsplit(x, "SGB")[[1]]
-  parts[[2]]=paste0("(SGB",parts[[2]],")")
-  paste0(parts[[1]],parts[[2]])
-})
-SGB_list=unique(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB1)
-SGB_list=SGB_list[c(1:3,5,4)]
-
-#new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age_m=apply(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_m,2,as.factor)
-#new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age_m=as.matrix(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_m)
-
-ha=rowAnnotation(SGB=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$Seniority,
-                 col=list(SGB=c("enriched" = "#D6604D", 
-                                "depleted" = "#4393C3")),
-                 annotation_name_gp = gpar(fontsize = 16),
-                 na_col = "grey90")
-
-p2a=Heatmap(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age_m,col=colors2,na_col = "grey90",
-           rect_gp = gpar(col = "grey60", lwd = 1),
-           column_split = c('age (65+)'),
-           show_row_names = F,
-           show_column_names = FALSE,
-           cluster_column_slices = FALSE,
-           cluster_row_slices = FALSE,
-           row_split = factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_age$SGB1,
-                              levels=SGB_list),
-           row_gap = unit(10, "mm"),
-           row_names_max_width = unit(12, "cm"),name='Direction',
-           column_names_gp = grid::gpar(fontsize = 18),
-           column_title_gp = grid::gpar(fontsize = 20),
-           row_title_rot = 0,
-           row_names_gp = grid::gpar(fontsize = 18),
-           row_title_gp = grid::gpar(fontsize = 20),
-           left_annotation = ha,
-           heatmap_legend_param = list(labels_gp = grid::gpar(fontsize = 18),
-                                       legend_direction = "horizontal", 
-                                       nrow=1,
-                                       legend_width = unit(0.9, "npc"),
-                                       title_gp = grid::gpar(fontsize = 20)))
-
-png('all_sweeps_reg_age_bidirection.png',width=2800,height=2000,res=300)
-draw(p2a)
-dev.off()
-```
-
-##CRC
-
-```{r}
-
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1 %>%
-  select("SGB","CRC.x","CRC.y")
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$Seniority=as.factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$CRC.y)
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC_m=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC %>% select("CRC.x")
-  
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB=gsub('_',' ',new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB)
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB1=sapply(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB, function(x) {
-  parts <- strsplit(x, "SGB")[[1]]
-  parts[[2]]=paste0("(SGB",parts[[2]],")")
-  paste0(parts[[1]],parts[[2]])
-})
-SGB_list=unique(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB1)
-SGB_list=SGB_list[c(1:3,5,4)]
-
-
-ha=rowAnnotation(SGB=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$CRC.y,
-                 col=list(SGB=c("enriched" = "#D6604D", 
-                                "depleted" = "#4393C3")),
-                 annotation_name_gp = gpar(fontsize = 16),
-                 na_col = "grey90")
-
-p2a=Heatmap(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC_m,col=colors2,na_col = "grey90",
-           rect_gp = gpar(col = "grey60", lwd = 1),
-           column_split = c('CRC'),
-           show_row_names = F,
-           show_column_names = FALSE,
-           cluster_column_slices = FALSE,
-           cluster_row_slices = FALSE,
-           row_split = factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_CRC$SGB1,
-                              levels=SGB_list),
-           row_gap = unit(10, "mm"),
-           row_names_max_width = unit(12, "cm"),name='Direction',
-           column_names_gp = grid::gpar(fontsize = 18),
-           column_title_gp = grid::gpar(fontsize = 20),
-           row_title_rot = 0,
-           row_names_gp = grid::gpar(fontsize = 18),
-           row_title_gp = grid::gpar(fontsize = 20),
-           left_annotation = ha,
-           heatmap_legend_param = list(labels_gp = grid::gpar(fontsize = 18),
-                                       legend_direction = "horizontal", 
-                                       nrow=1,
-                                       legend_width = unit(0.9, "npc"),
-                                       title_gp = grid::gpar(fontsize = 20)))
-
-png('all_sweeps_reg_CRC_bidirection.png',width=2800,height=2000,res=300)
-draw(p2a)
-dev.off()
-
-```
-##T2D
-
-```{r}
-
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_1 %>%
-  select("SGB","T2D.x","T2D.y")
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$Seniority=as.factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$T2D.y)
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D_m=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D %>% select("T2D.x")
-  
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB=gsub('_',' ',new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB)
-new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB1=sapply(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB, function(x) {
-  parts <- strsplit(x, "SGB")[[1]]
-  parts[[2]]=paste0("(SGB",parts[[2]],")")
-  paste0(parts[[1]],parts[[2]])
-})
-SGB_list=unique(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB1)
-SGB_list=SGB_list[c(1:3,5,4)]
-
-
-ha=rowAnnotation(SGB=new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$T2D.y,
-                 col=list(SGB=c("enriched" = "#D6604D","depleted" = "#4393C3"
-                                )),
-                 annotation_name_gp = gpar(fontsize = 16),
-                 na_col = "grey90")
-
-p2a=Heatmap(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D_m,col=colors2[2:3],na_col = "grey90",
-           rect_gp = gpar(col = "grey60", lwd = 1),
-           column_split = c('T2D'),
-           show_row_names = F,
-           show_column_names = FALSE,
-           cluster_column_slices = FALSE,
-           cluster_row_slices = FALSE,
-           row_split = factor(new_issweep_geo_p_unmerged_both_df_geo_new_comb_filter_T2D$SGB1,
-                              levels=SGB_list),
-           row_gap = unit(10, "mm"),
-           row_names_max_width = unit(12, "cm"),name='Direction',
-           column_names_gp = grid::gpar(fontsize = 18),
-           column_title_gp = grid::gpar(fontsize = 20),
-           row_title_rot = 0,
-           row_names_gp = grid::gpar(fontsize = 18),
-           row_title_gp = grid::gpar(fontsize = 20),
-           left_annotation = ha,
-           heatmap_legend_param = list(labels_gp = grid::gpar(fontsize = 18),
-                                       legend_direction = "horizontal", 
-                                       nrow=1,
-                                       legend_width = unit(0.9, "npc"),
-                                       title_gp = grid::gpar(fontsize = 20)))
-
-png('all_sweeps_reg_T2D_bidirection.png',width=2450,height=2000,res=300)
-draw(p2a)
-dev.off()
-
-```
-
-
-##general enrichment in sweeps
-```{r}
-# first ask if any symptoms are enriched in sweeps for age
-new_issweep_list_1=mapply(function(x,y) y=y %>% mutate(issweep=case_when(sample_id %in% x$sample_id ~ 'sweep', TRUE~ 'notsweep')),
-                          newtotalsweep_merged_list_1,newtotalstrain_list_1,SIMPLIFY = F)
-
-
-new_issweep_p_1=list()
-new_issweep_tab_list_1=list()
-for (i in 1:length(new_issweep_list_1)){
-  new_issweep_tab_1=new_issweep_list_1[[i]] %>% count(issweep,age_category) %>% spread(age_category,n,fill = 0)
-  new_issweep_tab_1= new_issweep_tab_1 %>% 
-    select(-issweep)
-  new_issweep_tab_list_1[[i]]=new_issweep_tab_1
-  if (nrow(new_issweep_tab_1)>1){
-    new_issweep_p_1[[i]]=chisq.test(new_issweep_tab_1)$p.value
-  } else {
-    new_issweep_p_1[[i]]=1
-  }
-}
-
-names(new_issweep_p_1)=names(new_issweep_list_1)
-names(new_issweep_tab_list_1)=names(new_issweep_list_1)
-new_issweep_p_df_1=t(bind_rows(new_issweep_p_1,.id='SGB'))
-new_issweep_p_df_1=as.data.frame(new_issweep_p_df_1)
-new_issweep_p_df_1$p.adj=p.adjust(new_issweep_p_df_1$V1,method = 'fdr')
-age_list=rownames(new_issweep_p_df_1)[new_issweep_p_df_1$p.adj<0.05]
-new_issweep_p_df_1[age_list,]
-```
-
-
-```{r}
-# ask if any symptoms are enriched in sweeps, CRC
-new_issweep_list_2=mapply(function(x,y) y=y %>% mutate(issweep=case_when(sample_id %in% x$sample_id ~ 'sweep', TRUE~ 'notsweep')),
-                          newtotalsweep_merged_list_2,newtotalstrain_list_2,SIMPLIFY = F)
-
-new_issweep_p_2=list()
-new_issweep_tab_list_2=list()
-for (i in 1:length(new_issweep_list_2)){
-  new_issweep_tab_2=new_issweep_list_2[[i]] %>% count(issweep,disease) %>% spread(disease,n,fill = 0)
-  new_issweep_tab_2= new_issweep_tab_2 %>% 
-    select(-issweep)
-  new_issweep_tab_list_2[[i]]=new_issweep_tab_2
-  if (nrow(new_issweep_tab_2)>1){
-    new_issweep_p_2[[i]]=chisq.test(new_issweep_tab_2)$p.value
-  } else {
-    new_issweep_p_2[[i]]=1
-  }
-}
-
-names(new_issweep_p_2)=names(new_issweep_list_2)
-names(new_issweep_tab_list_2)=names(new_issweep_list_2)
-new_issweep_p_df_2=t(bind_rows(new_issweep_p_2,.id='SGB'))
-new_issweep_p_df_2=as.data.frame(new_issweep_p_df_2)
-new_issweep_p_df_2$p.adjust=p.adjust(new_issweep_p_df_2$V1,method='fdr')
-CRC_list=rownames(new_issweep_p_df_2)[new_issweep_p_df_2$p.adjust<0.05]
-new_issweep_p_df_2[CRC_list,]
-
-```
-```{r}
-# ask if any symptoms are enriched in sweeps, IBD
-new_issweep_list_3=mapply(function(x,y) y=y %>% mutate(issweep=case_when(sample_id %in% x$sample_id ~ 'sweep', TRUE~ 'notsweep')),
-                          newtotalsweep_merged_list_3,newtotalstrain_list_3,SIMPLIFY = F)
-
-new_issweep_p_3=list()
-new_issweep_tab_list_3=list()
-for (i in 1:length(new_issweep_list_3)){
-  new_issweep_tab_3=new_issweep_list_3[[i]] %>% count(issweep,disease) %>% spread(disease,n,fill = 0)
-  new_issweep_tab_3= new_issweep_tab_3 %>% 
-    select(-issweep)
-  new_issweep_tab_list_3[[i]]=new_issweep_tab_3
-  if (nrow(new_issweep_tab_3)>1){
-    new_issweep_p_3[[i]]=chisq.test(new_issweep_tab_3)$p.value
-  } else {
-    new_issweep_p_3[[i]]=1
-  }
-}
-
-names(new_issweep_p_3)=names(new_issweep_list_3)
-names(new_issweep_tab_list_3)=names(new_issweep_list_3)
-new_issweep_p_df_3=t(bind_rows(new_issweep_p_3,.id='SGB'))
-new_issweep_p_df_3=as.data.frame(new_issweep_p_df_3)
-new_issweep_p_df_3$p.adjust=p.adjust(new_issweep_p_df_3$V1,method='fdr')
-IBD_list=rownames(new_issweep_p_df_3)[new_issweep_p_df_3$p.adjust<0.05]
-new_issweep_p_df_3[IBD_list,]
-
-```
-```
-
-```{r}
-# ask if any symptoms are enriched in sweeps, T2D
-new_issweep_list_4=mapply(function(x,y) y=y %>% mutate(issweep=case_when(sample_id %in% x$sample_id ~ 'sweep', TRUE~ 'notsweep')),
-                          newtotalsweep_merged_list_4,newtotalstrain_list_4,SIMPLIFY = F)
-
-
-new_issweep_p_4=list()
-new_issweep_tab_list_4=list()
-for (i in 1:length(new_issweep_list_4)){
-  new_issweep_tab_4=new_issweep_list_4[[i]] %>% count(issweep,disease) %>% spread(disease,n,fill = 0)
-  new_issweep_tab_4= new_issweep_tab_4 %>% 
-    select(-issweep)
-  new_issweep_tab_list_4[[i]]=new_issweep_tab_4
-  if (nrow(new_issweep_tab_4)>1){
-    new_issweep_p_4[[i]]=chisq.test(new_issweep_tab_4)$p.value
-  } else {
-    new_issweep_p_4[[i]]=1
-  }
-}
-
-names(new_issweep_p_4)=names(new_issweep_list_4)
-names(new_issweep_tab_list_4)=names(new_issweep_list_4)
-new_issweep_p_df_4=t(bind_rows(new_issweep_p_4,.id='SGB'))
-new_issweep_p_df_4=as.data.frame(new_issweep_p_df_4)
-new_issweep_p_df_4$p.adjust=p.adjust(new_issweep_p_df_4$V1,method='fdr')
-T2D_list=rownames(new_issweep_p_df_4)[new_issweep_p_df_4$p.adjust<0.05]
-new_issweep_p_df_4[T2D_list,]
 
 ```
 

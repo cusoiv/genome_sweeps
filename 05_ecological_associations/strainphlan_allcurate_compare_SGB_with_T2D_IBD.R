@@ -191,7 +191,7 @@ for (s in 1:nrow(new_isSGB_p_df_unmerged_1_age)){
   # is sweep dominated by a country, and also check sweep direction (enrich for age or no)
   observed_freq <- table(SGB_list$country)
   if (length(observed_freq)>1){
-    new_isSGB_geo_p_unmerged_1_age[[s]]=c(chisq.test(observed_freq)$p.value,new_isSGB_p_df_unmerged_1_age$coef[s]>0)
+    new_isSGB_geo_p_unmerged_1_age[[s]]=c(chisq.test(observed_freq)$p.value,new_isSGB_p_df_unmerged_1_age$coef[s]>0)   #>0 because it is adult vs. senior
   }else{
     new_isSGB_geo_p_unmerged_1_age[[s]]=c(0,new_isSGB_p_df_unmerged_1_age$coef[s]>0)
   }
@@ -487,9 +487,9 @@ for (s in 1:nrow(new_isSGB_p_df_unmerged_3b_UC)){
   # is sweep dominated by a country, and also check sweep direction (enrich for disease or no)
   observed_freq <- table(SGB_list$country)
   if (length(observed_freq)>1){
-    new_isSGB_geo_p_unmerged_3b_UC[[s]]=c(chisq.test(observed_freq)$p.value,new_isSGB_p_df_unmerged_3b_UC$coef[s]<0) #here needs to be <0 because the correlation is for non-UC
+    new_isSGB_geo_p_unmerged_3b_UC[[s]]=c(chisq.test(observed_freq)$p.value,new_isSGB_p_df_unmerged_3b_UC$coef[s]>0) #here needs to be >0 because the correlation is for non-UC
   }else{
-    new_isSGB_geo_p_unmerged_3b_UC[[s]]=c(0,new_isSGB_p_df_unmerged_3b_UC$coef[s]<0)  #here needs to be <0 because the correlation is for non-UC
+    new_isSGB_geo_p_unmerged_3b_UC[[s]]=c(0,new_isSGB_p_df_unmerged_3b_UC$coef[s]>0)  #here needs to be >0 because the correlation is for non-UC
   }
   names(new_isSGB_geo_p_unmerged_3b_UC)[s]=taxa
 }
