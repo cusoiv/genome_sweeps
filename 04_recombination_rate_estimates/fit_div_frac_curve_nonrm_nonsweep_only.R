@@ -6,10 +6,12 @@ library(micropan)
 library(RColorBrewer)
 library(iNEXT)
 library(viridis)
-library(breakaway)
+#library(breakaway)
 library(dpseg)
 library(KneeArrower)
 library(ggpmisc)
+library(patchwork)
+library(svglite)
 
 setwd("C:/Users/Xiaoqian/Desktop/pop_gen/UHGG_plus4/SGBdiffH_500_1pois_1nb_finda/")
 lb_list <- Sys.glob("SGB*diffH.txt/SGBdiffH.length_bias_500.txt")
@@ -133,8 +135,8 @@ for (j in 1:length(lbfile_list_summary_n20_filter_list)){
 
 redo_list=c()
 r1_list=c()
-png('new_fits_nonsweepy_only/segs_fit_r1s.png',res=300,width = 8000,height=5000)
-par(mfrow=c(8,8))
+#png('new_fits_nonsweepy_only/segs_fit_r1s.png',res=300,width = 8000,height=5000)
+#par(mfrow=c(8,8))
 for (j in 1:length(segs_list)){
   if (segs_list[[j]]$segments$r2[1]>0.8 & segs_list[[j]]$segments$slope[1]>0){
     r2=round(segs_list[[j]]$segments$r2[1],2)
@@ -144,7 +146,7 @@ for (j in 1:length(segs_list)){
     redo_list=c(redo_list,j)
   }
 }
-dev.off()
+#dev.off()
 
 find_cutoff=function(x){
   ss=x$segments$slope
@@ -186,8 +188,8 @@ for (j in redo_list ){
 
 
 r2_list=c()
-png('new_fits_nonsweepy_only/segs_fit_rs_p1s.png',res=300,width = 8000,height=5000)
-par(mfrow=c(10,8))
+#png('new_fits_nonsweepy_only/segs_fit_rs_p1s.png',res=300,width = 8000,height=5000)
+#par(mfrow=c(10,8))
 for (j in redo_list){
   r2=round(segs_list_2[[j]]$segments$r2[1],2)
   if (r2>0.33 & segs_list_2[[j]]$segments$slope[1]>0){
@@ -195,13 +197,13 @@ for (j in redo_list){
     r2_list=c(r2_list,j)
   }
 }
-dev.off()
+#dev.off()
 
 #check ones that are eliminated
 r12_list=c(r1_list,r2_list)
 new_redo_list=c()
-png('new_fits_nonsweepy_only/r2_omit_summary_2s.png',width=8000,height=6000,res=300)
-par(mfrow=c(10,7))
+#png('new_fits_nonsweepy_only/r2_omit_summary_2s.png',width=8000,height=6000,res=300)
+#par(mfrow=c(10,7))
 for (j in 1:length(lbfile_list_summary_n20_filter_list)){
   l=lbfile_list_summary_n20_filter_list[[j]]
   l=l %>% arrange(div)
@@ -215,7 +217,7 @@ for (j in 1:length(lbfile_list_summary_n20_filter_list)){
       new_redo_list=c(new_redo_list,j)
     }
 }
-dev.off()
+#dev.off()
 
 fit_lists=c(r1_list,r2_list)
 all_lists=1:length(lbfile_list_summary_n20_filter_list)
@@ -245,8 +247,8 @@ cutoff_list=c(2000,1000,1000,800,3000,500,500,500,500,500,500,5000,1000,600)
 seg_slope_list={}
 c=1
 d=1
-png('new_fits_nonsweepy_only/r2_good_fits_summary.png',width=8000,height=6000,res=300)
-par(mfrow=c(10,8))
+#png('new_fits_nonsweepy_only/r2_good_fits_summary.png',width=8000,height=6000,res=300)
+#par(mfrow=c(10,8))
 for (j in 1:length(lbfile_list_summary_n20_filter_list)){
   l=lbfile_list_summary_n20_filter_list[[j]]
   l=l %>% arrange(div)
@@ -312,7 +314,7 @@ for (j in 1:length(lbfile_list_summary_n20_filter_list)){
     d=d+1
   }
 }
-dev.off()
+#dev.off()
 
 badfit_lists=c(13,50,60)
 cutoff_list_2=c(1000,1000,2000)
@@ -344,6 +346,7 @@ c=1
 d=1
 e=1
 
+#Figure S1a
 png('new_fits_nonsweepy_only/r2_good_fits_summary_2a_commensals.png',width=5500,height=5500/10*13,res=300)
 par(mfrow=c(13,4),mai = c(0.3, 0.3, 0.3, 0.1))
 for (j in 1:length(lbfile_list_summary_n20_filter_list)){
@@ -461,10 +464,11 @@ for (j in 1:length(lbfile_list_summary_n20_filter_list)){
 }
 dev.off()
 
-
-
 seg_slope_all_nonsweepy=bind_rows(seg_slope_list) 
 write.csv(seg_slope_all_nonsweepy,'seg_slope_all_nonrm_nonsweepy.csv',row.names = F)
+
+## Compare the recombination rate between sweeps with 
+
 seg_slope_all_nonsweepy=read.csv('seg_slope_all_nonrm_nonsweepy.csv')
 seg_slope_all=read.csv('seg_slope_all_nonrm.csv')
 seg_slope_all_nonsweepy_commensals=seg_slope_all_nonsweepy %>% 
@@ -481,52 +485,69 @@ wilcox.test(seg_slope_all_sweepy_commensals$slope,
             seg_slope_all_nonsweepy_commensals$slope)
 
 
-seg_slope_all_nonsweepy_commensals$Type='SGBs\nwithout sweep'
-seg_slope_all_sweepy_commensals$Type='SGBs\nwith sweep'
+seg_slope_all_nonsweepy_commensals$Type='SGBs without sweep'
+seg_slope_all_sweepy_commensals$Type='SGBs with sweep'
 seg_slope_all_commensals=bind_rows(seg_slope_all_nonsweepy_commensals,
                                    seg_slope_all_sweepy_commensals)
 seg_slope_all_commensals=seg_slope_all_commensals %>%
   mutate(Genus=case_when(grepl('Blautia',taxa)~'Blautia',TRUE ~ 'Others'))
-seg_slope_all_commensals$Type=factor(seg_slope_all_commensals$Type,levels=c('SGBs\nwithout sweep','SGBs\nwith sweep'))
-
-
-library(ggdist)
-library(gghalves)
-head(seg_slope_all_commensals)
-
-p2=ggplot(seg_slope_all_commensals,aes(x=factor(Type),y=log10(slope)))+
-  
-  geom_dotplot(binpositions="all",method='histodot',aes(fill=Genus,color=Genus),color=NA,binaxis='y',stackgroups=TRUE)+
-  theme_bw()+scale_fill_manual(values=c("#E69F00","grey80"))+
-  geom_half_boxplot(errorbar.length = 0.3,width=.4,color='grey30')+
-  scale_color_manual(values=c("#E69F00","grey80"))+
-  theme(legend.text = element_text(face = "italic"),text = element_text(size = 20))+
-  xlab('')+
-  ylab('log10(Fraction genome recombined per mutation)')+
-  coord_flip()
-
-png('new_fits_nonsweepy_only/compare_sweep_nonsweep_2.png', res=300, width=3000, height =1500)
-p2
-dev.off()
-  
+seg_slope_all_commensals$Type=factor(seg_slope_all_commensals$Type,levels=c('SGBs without sweep','SGBs with sweep'))
 
 seg_slope_all_commensals_median=seg_slope_all_commensals %>% group_by(Type) %>%
   summarise(median_slope=median(slope))
 
 p=ggplot(seg_slope_all_commensals,aes(x=log10(slope),fill=Type))+
   geom_histogram(alpha=0.6, position="identity")+
-  facet_grid(Type ~.)+
+  facet_wrap(Type ~.,nrow=2)+
   geom_vline(data=seg_slope_all_commensals_median, aes(xintercept=log10(median_slope), color=Type),
              linetype="dashed")+
-  scale_fill_manual(values=c("#2171B5","#018571"))+
-  scale_color_manual(values=c("#2171B5","#018571"))+
-  xlab('log10(Fraction genome recombined per mutation)')+
-  theme_bw()+
-  theme(text = element_text(size = 14))
+  scale_fill_manual(values=c("grey80","#cc747c"))+
+  scale_color_manual(values=c("grey60","#cc747c"))+
+  scale_y_continuous(breaks = seq(0, 10, by = 5))+
+  xlab('')+
+  ylab('# of SGBs')+
+  theme_minimal()+
+  theme(text = element_text(size = 16),legend.title = element_blank(),strip.text = element_blank())+
+  theme(
+    strip.placement = "outside",  # places labels outside axes
+    strip.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.ticks.x =element_line(color = "black"),
+    legend.text = element_text(size = 16),
+    axis.title.y = element_text(margin = margin(r = 20))
+    )+
+  xlim(c(-5.5,-2))
 
-png('new_fits_nonsweepy_only/compare_sweep_nonsweep.png', res=300, width=1800, height =1500)
-p
+seg_slope_all_blautia=seg_slope_all_commensals %>% filter(Genus=='Blautia')
+seg_slope_all_blautia=seg_slope_all_blautia %>% mutate(class=case_when(taxa=='s__Blautia_massiliensis_SGB4826' ~ 'Blautia massiliensis\n(SGB4826)', TRUE ~ 'Other Blautia'))
+
+pb=ggplot(seg_slope_all_blautia,aes(fill=factor(Type),color=factor(class),x=log10(slope),y='1'))+
+  geom_point(size=5,shape = 21,stroke = 2)+
+  scale_fill_manual(values=c("grey80","#cc747c"))+
+  theme_minimal()+scale_color_manual(values=c("darkred","transparent"),labels = c(bquote(atop(italic("Blautia massiliensis"), "(SGB4826)"))))+
+  xlab('log10(Fraction genome recombined per mutation)')+
+  xlim(c(-5.5,-2))+
+  theme(axis.ticks.y = element_blank(),axis.title.y = element_blank(),axis.text =element_blank(),legend.title = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        text = element_text(size = 16),
+        legend.text = element_text(size = 16),
+        # Make horizontal grid lines (y-axis) black
+        panel.grid.major.y = element_line(color = "black"),
+        panel.grid.minor.y = element_line(color = "black"))+
+  guides(fill = "none")
+
+#Figure 3
+png('new_fits_nonsweepy_only/compare_sweep_nonsweep_Blautia.png', res=300, width=2500, height =1200)
+wrap_plots(p, pb, ncol = 1) +
+  plot_layout(heights = c(3, 1)) 
 dev.off()
+
+combined_plots=wrap_plots(p, pb, ncol = 1) +
+  plot_layout(heights = c(3, 1)) 
+ggsave('new_fits_nonsweepy_only/compare_sweep_nonsweep_Blautia.svg',plot=combined_plots,width=2500, height =1200,units='px')
+
+
 
 
 seg_slope_all_commensals_export=seg_slope_all_commensals[,1:3]

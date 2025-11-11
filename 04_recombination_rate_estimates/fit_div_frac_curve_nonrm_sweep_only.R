@@ -110,8 +110,8 @@ for (j in 1:length(lbfile_list_summary_n20_filter_list)){
 
 redo_list=c()
 r1_list=c()
-png('new_fits_sweepy_only/segs_fit_r1s.png',res=300,width = 8000,height=5000)
-par(mfrow=c(8,8))
+#png('new_fits_sweepy_only/segs_fit_r1s.png',res=300,width = 8000,height=5000)
+#par(mfrow=c(8,8))
 for (j in 1:length(segs_list)){
   if (segs_list[[j]]$segments$r2[1]>0.8 & segs_list[[j]]$segments$slope[1]>0){
     r2=round(segs_list[[j]]$segments$r2[1],2)
@@ -121,7 +121,7 @@ for (j in 1:length(segs_list)){
     redo_list=c(redo_list,j)
   }
 }
-dev.off()
+#dev.off()
 
 find_cutoff=function(x){
   ss=x$segments$slope
@@ -163,8 +163,8 @@ for (j in redo_list ){
 
 
 r2_list=c()
-png('new_fits_sweepy_only/segs_fit_rs_p1s.png',res=300,width = 8000,height=5000)
-par(mfrow=c(10,8))
+#png('new_fits_sweepy_only/segs_fit_rs_p1s.png',res=300,width = 8000,height=5000)
+#par(mfrow=c(10,8))
 for (j in redo_list){
   r2=round(segs_list_2[[j]]$segments$r2[1],2)
   if (r2>0.33 & segs_list_2[[j]]$segments$slope[1]>0){
@@ -172,13 +172,13 @@ for (j in redo_list){
     r2_list=c(r2_list,j)
   }
 }
-dev.off()
+#dev.off()
 
 #check ones that are eliminated
 r12_list=c(r1_list,r2_list)
 new_redo_list=c()
-png('new_fits_sweepy_only/r2_omit_summary_2s.png',width=8000,height=6000,res=300)
-par(mfrow=c(10,7))
+#png('new_fits_sweepy_only/r2_omit_summary_2s.png',width=8000,height=6000,res=300)
+#par(mfrow=c(10,7))
 for (j in 1:length(lbfile_list_summary_n20_filter_list)){
   l=lbfile_list_summary_n20_filter_list[[j]]
   l=l %>% arrange(div)
@@ -192,7 +192,7 @@ for (j in 1:length(lbfile_list_summary_n20_filter_list)){
     }
   }
 }
-dev.off()
+#dev.off()
 
 
 fit_lists=c(r1_list,r2_list)
@@ -225,8 +225,8 @@ cutoff_list=c(1500,900,10000,5000,5000,5000,700,2500,8000,3500,1000,3500,2000,
 seg_slope_list={}
 c=1
 d=1
-png('new_fits_sweepy_only/r2_good_fits_summary.png',width=8000,height=6000,res=300)
-par(mfrow=c(10,7))
+#png('new_fits_sweepy_only/r2_good_fits_summary.png',width=8000,height=6000,res=300)
+#par(mfrow=c(10,7))
 for (j in 1:length(lbfile_list_summary_n20_filter_list)){
   l=lbfile_list_summary_n20_filter_list[[j]]
   l=l %>% arrange(div)
@@ -292,7 +292,7 @@ for (j in 1:length(lbfile_list_summary_n20_filter_list)){
     d=d+1
   }
 }
-dev.off()
+#dev.off()
 
 #check for plots that didn't fit well
 badfit_lists=c(22,25,32,47,57,58,59)
@@ -322,6 +322,10 @@ r2_list=r2_list[!(r2_list %in% badfit_lists)]
 #read in taxa classification
 taxa_class=read.csv('../instrain/taxa_class_all.csv')
 taxa_class_include=c(taxa_class$commensals)
+
+
+
+# Figure S1b
 
 seg_slope_list={}
 c=1
@@ -447,218 +451,9 @@ for (j in 1:65){
 dev.off()
 
 
-png('new_fits_sweepy_only/r2_good_fits_summary_2b_new.png',width=5000,height=5000,res=300)
-par(mfrow=c(10,4),mai = c(0.3, 0.3, 0.3, 0.1))
-for (j in 32:length(lbfile_list_summary_n20_filter_list)){
-  l=lbfile_list_summary_n20_filter_list[[j]]
-  l=l %>% arrange(div)
-  test=data.frame(x=l$div,y=l$totalR)
-  
-  if (j %in% r1_list){
-    test_o=test
-    #    if (sum(test$x<0.001*2000000)>100){
-    #      ss=seq(1, nrow(test), round(nrow(test)/100))
-    #      test=test[ss,]
-    #    }
-    
-    n1=segs_list[[j]]$segments$start[1]
-    n2=segs_list[[j]]$segments$end[1]
-    test1=test[n1:n2,]
-    test1=rbind(c(0,0),test1)
-    if (max(test$y)/min(test$y)>1.5){
-      ft=lm(y ~ 0+x,data=test1)
-      r2=round(summary(ft)$r.squared,2)
-      mt=gsub('s__','',paste0(names(lbfile_list_summary_n20_filter_list)[[j]],'_',r2))
-      if(names(lbfile_list_summary_n20_filter_list)[j] %in% taxa_class_include){
-      plot(test_o,pch=20,col='grey60',
-           main=mt,xlab="",ylab="",xlim=c(0,0.004*4000000),ylim=c(0,1),cex.main = 1.5,cex.axis = 1.5)
-      points(test1,col='red',pch=20)
-      abline(ft)
-      }
-      seg_slope_list[[j]]=data.frame(taxa=names(lbfile_list_summary_n20_filter_list)[[j]],
-                                     slope=ft$coefficients[1])
-      c=c+1
-    }
-  } else if (j %in% r2_list) {
-    test_o=test
-    #  if (sum(test$x<0.001*2000000)>100){
-    #     ss=seq(1, nrow(test), round(nrow(test)/100))
-    #     test=test[ss,]
-    #   }
-    n1=segs_list_2[[j]]$segments$start[1]
-    n2=segs_list_2[[j]]$segments$end[1]
-    test1=test[n1:n2,]
-    test1=rbind(c(0,0),test1)
-    if (max(test$y)/min(test$y)>1.5){
-      ft=lm(y ~ 0+x,data=test1)
-      r2=round(summary(ft)$r.squared,2)
-      mt=gsub('s__','',paste0(names(lbfile_list_summary_n20_filter_list)[[j]],'_',r2))
-      if(names(lbfile_list_summary_n20_filter_list)[j] %in% taxa_class_include){
-      plot(test_o,pch=20,col='grey60',
-           main=mt,xlab="",ylab="",xlim=c(0,0.004*4000000),ylim=c(0,1),cex.main = 1.5,cex.axis = 1.5)
-      points(test1,col='red',pch=20)
-      abline(ft)
-      }
-      seg_slope_list[[j]]=data.frame(taxa=names(lbfile_list_summary_n20_filter_list)[[j]],
-                                     slope=ft$coefficients[1])
-      c=c+1
-    }
-  } else if  (j %in% unfit_lists) {
-    test_o=test
-    cutoff=cutoff_list[d]
-    test1=test[test$x<cutoff,]
-    test1=rbind(c(0,0),test1)
-    ft=lm(y~0+x,test1)
-    r2=round(summary(ft)$r.squared,2)
-    mt=gsub('s__','',paste0(names(lbfile_list_summary_n20_filter_list)[[j]],'_',r2))
-    if(names(lbfile_list_summary_n20_filter_list)[j] %in% taxa_class_include){
-    plot(test_o,pch=20,col='grey60',
-         main=mt,xlab="",ylab="",xlim=c(0,0.004*4000000),ylim=c(0,1),cex.main = 1.5,cex.axis = 1.5)
-    points(test1,col='red',pch=20)
-    abline(ft)
-    }
-    seg_slope_list[[j]]=data.frame(taxa=names(lbfile_list_summary_n20_filter_list)[[j]],
-                                   slope=ft$coefficients[1])
-    c=c+1
-    d=d+1
-  } else if  (j %in% badfit_lists) {
-    test_o=test
-    cutoff=cutoff_list_2[e]
-    test1=test[test$x<cutoff,]
-    test1=rbind(c(0,0),test1)
-    ft=lm(y~0+x,test1)
-    r2=round(summary(ft)$r.squared,2)
-    mt=gsub('s__','',paste0(names(lbfile_list_summary_n20_filter_list)[[j]],'_',r2))
-    if(names(lbfile_list_summary_n20_filter_list)[j] %in% taxa_class_include){
-    plot(test_o,pch=20,col='grey60',
-         main=mt,xlab="",ylab="",xlim=c(0,0.004*4000000),ylim=c(0,1),cex.main = 1.5,cex.axis = 1.5)
-    points(test1,col='red',pch=20)
-    abline(ft)
-    }
-    seg_slope_list[[j]]=data.frame(taxa=names(lbfile_list_summary_n20_filter_list)[[j]],
-                                   slope=ft$coefficients[1])
-    c=c+1
-    e=e+1
-  }
-}
-dev.off()
-
 all_sweep_info_total_list_SGB_summary=read.csv('../instrain/all_sweep_info_total_list_SGB_summary.csv',header = T)
 
-seg_slope_all=bind_rows(seg_slope_list) 
+seg_slope_all_new=bind_rows(seg_slope_list) 
 write.csv(seg_slope_all,'seg_slope_all_nonrm.csv',row.names = F)
-seg_slope_all=read.csv('seg_slope_all_nonrm.csv')
-seg_slope_all$SGB=sapply(strsplit(seg_slope_all$taxa,split = "_"), function(x) x[length(x)])
-seg_slope_all=merge(seg_slope_all,all_sweep_info_total_list_SGB_summary,by='SGB',all.x=T)
-seg_slope_all$sweepy=seg_slope_all$n_in_sweep/seg_slope_all$total_n
-seg_slope_all$sweepy[is.na(seg_slope_all$sweepy)]=0
-SGB_class=read.csv('SGB_classify_list.csv')
-seg_slope_all=seg_slope_all %>% mutate(class=case_when(taxa %in% SGB_class$pathogen ~ 'pathogens',
-                                                       taxa %in% SGB_class$probiotics ~ 'probiotics',
-                                                       TRUE ~ 'commensals'))
-
-seg_slope_all_2=seg_slope_all %>% filter(class!='probiotics')
-names(seg_slope_all_2)=c('taxa','recombination_rate','class')
-
-write.csv(seg_slope_all_2,'seg_slope_all_nonrm_2.csv',row.names = F)
-
-
-taxa_list=read.table("../fastANI_clust.average.diffH.94s.fgspecies.txt",
-                     sep='\t',header=T)
-taxa_list_summary=taxa_list %>% group_by(cluster) %>% count(fgspecies) %>% slice(which.max(n))
-taxa_list_summary$species=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',3)
-taxa_list_summary$genus=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',2)
-taxa_list_summary$family=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',1)
-taxa_list_summary=taxa_list_summary %>% mutate(taxa = case_when(species=='s__' ~ paste0(genus,'_',species),
-                                                                TRUE ~ paste0(species)))
-taxa_list_summary$cluster_taxa=paste(taxa_list_summary$taxa,taxa_list_summary$cluster,sep = "_")
-seg_slope_all=merge(taxa_list_summary,seg_slope_all,by.x = 'cluster_taxa',by.y='taxa')
-
-num_colors <- length(unique(seg_slope_all$family))
-getPalette = colorRampPalette(brewer.pal(8, "Dark2"))
-
-seg_slope_all$log10_total_n=log10(seg_slope_all$total_n)
-
-
-
-
-
-seg_slope_all$family=as.factor(seg_slope_all$family)
-seg_slope_all$single_ratio=seg_slope_all$MG_n/(seg_slope_all$MG_mixed_n+seg_slope_all$MG_n)
-seg_slope_all$single_ratio_2=seg_slope_all$MG_n/(seg_slope_all$MG_exist_n)
-
-seg_slope_all=seg_slope_all %>% 
-  filter(sweepy>0)
-seg_slope_all_c=seg_slope_all %>% filter(class=='commensals') %>% 
-  filter(sweepy>0)
-seg_slope_all_c_2=seg_slope_all_c %>% group_by(family) %>% 
-  filter(n() > 1)
-ggplot(seg_slope_all_c_2,aes(x=family,y=slope))+geom_point()+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-seg_slope_all_anova=aov(slope ~ family, data = seg_slope_all_c_2)
-TukeyHSD(seg_slope_all_anova)
-
-seg_sweepy_all_anova=aov(sweepy ~ family, data = seg_slope_all_c_2)
-TukeyHSD(seg_sweepy_all_anova)
-
-
-cor.test(seg_slope_all_c$sweepy,seg_slope_all_c$single_ratio,method='spearman')
-cor.test(seg_slope_all_c$sweepy,seg_slope_all_c$slope,method='spearman')
-cor.test(seg_slope_all_c$single_ratio,seg_slope_all_c$slope,method='spearman')
-
-
-#write.csv(seg_slope_all,'seg_slope_all.csv',row.names = F)
-
-#seg_slope_all_norm=read.csv('seg_slope_all_nonrm.csv')
-
-#slope/100 for non-rm, slope for rm
-cor.test(seg_slope_all_c$sweepy,seg_slope_all_c$slope,method = 'spearman')
-seg_slope_all$family=gsub('f__','',seg_slope_all$family)
-seg_slope_all_2=seg_slope_all %>% filter(class!='probiotics')
-p2=ggplot(seg_slope_all_2, aes(x = sweepy, y = slope, color = family,group=class,
-                             size=log10(total_n))) +
-  scale_color_manual(values = getPalette(num_colors)) +
-  facet_wrap(~class)+
-  #  scale_y_log10()+
-  geom_point() +
-  stat_correlation(method='spearman',use_label(c("r", "p")),small.r = TRUE,small.p = TRUE,label.x = "right",size=5) +
-  #  stat_poly_line(se=F,lty=2)+
-  theme_bw()+
-  theme(legend.position = "right",text = element_text(size = 18))+
-  guides(color=guide_legend(ncol = 3, byrow=TRUE,title.position = "top",title = "Family",
-                            override.aes = list(label = "\u25A0", size = 7)),
-         size=guide_legend(ncol=4,title="log10 (sweep size)",override.aes = list(linetype = 0)))+
-  xlab('Dominance of sweeps')+
-  ylab('Fraction genome recombined per mutation')
-
-png('new_fits_sweepy_only/sweep_slope_correlation_nolog_2_2.png', res=300, width=4000, height =1800)
-p2
-dev.off()
-
-#for commensals only
-seg_slope_all_c$family=gsub('f__','',seg_slope_all_c$family)
-p2c=ggplot(seg_slope_all_c, aes(x = sweepy, y = slope, color = family,group=class,
-                                size=log10(total_n))) +
-  scale_color_manual(values = getPalette(num_colors)) +
-  # facet_wrap(~class)+
-  #  scale_y_log10()+
-  geom_point() +
-  stat_correlation(method='spearman',use_label(c("r", "p")),small.r = TRUE,small.p = TRUE,label.x = "right",size=8) +
-  #  stat_poly_line(se=F,lty=2)+
-  theme_bw()+
-  theme(legend.position = "right",text = element_text(size = 22))+
-  guides(color=guide_legend(ncol = 2, byrow=TRUE,title.position = "top",title = "Family",
-                            override.aes = list(label = "\u25A0", size = 7)),
-         size=guide_legend(ncol=4,title="log10 (sweep size)",override.aes = list(linetype = 0)))+
-  xlab('Dominance of sweeps')+
-  ylab('Fraction genome recombined per mutation')
-
-png('new_fits_sweepy_only/sweep_slope_correlation_nolog_2_commensal_only_2.png', res=300, width=4000, height =2000)
-p2c
-dev.off()
-
-
-seg_slope_all_c
 
  
