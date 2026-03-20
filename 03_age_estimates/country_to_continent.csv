@@ -1,0 +1,136 @@
+Country,Continent,Continent_2
+Algeria,Africa,Africa
+Argentina,South America,South America
+Australia,Australia,Australia
+Austria,Europe,Europe
+AUT,Europe,Europe
+Bahrain,Asia,Asia
+Bangladesh,Asia,Asia
+BGD,Asia,Asia
+Brazil,South America,South America
+Cameroon,Africa,Africa
+Cameroon_Akonetye_Baaka,Traditionally-isolated,Africa
+Cameroon_Assok_Baaka,Traditionally-isolated,Africa
+Cameroon_Ngoantet_Beti,Africa,Africa
+CAN,North America,North America
+Canada,North America,North America
+Canada_ResoluteBay_Inuit,North America,North America
+Chile,South America,South America
+China,Asia,Asia
+CHN,Asia,Asia
+CMR,Africa,Africa
+CMR_Bagyeli,Traditionally-isolated,Africa
+CMR_Bagyeli_South,Traditionally-isolated,Africa
+CMR_Baka_East,Traditionally-isolated,Africa
+Colombia,South America,South America
+Costa Rica,North America,North America
+Cote d'Ivoire,Africa,Africa
+Czech Republic,Europe,Europe
+Denmark,Europe,Europe
+DEU,Europe,Europe
+DNK,Europe,Europe
+Dominican Republic,North America,North America
+ESP,Europe,Europe
+EST,Europe,Europe
+ETH,Africa,Africa
+FIN,Europe,Europe
+Finland,Europe,Europe
+Finland_Kainuu_Finnish,Europe,Europe
+Finland_Lapland_Sami,Europe,Europe
+FJI,Oceania,Oceania
+FRA,Europe,Europe
+France,Europe,Europe
+French Polynesia: Tahiti,Oceania,Oceania
+Gambia,Africa,Africa
+GBR,Europe,Europe
+Germany,Europe,Europe
+GHA,Africa,Africa
+Greece,Europe,Europe
+Guadeloupe,North America,North America
+Guinea,Africa,Africa
+Guinea-Bissau,Africa,Africa
+Guyana,South America,South America
+Haiti,North America,North America
+Hong Kong,Asia,Asia
+HUN,Europe,Europe
+IDN,Asia,Asia
+IND,Asia,Asia
+India,Asia,Asia
+Indonesia,Asia,Asia
+Iran,Asia,Asia
+Iraq,Asia,Asia
+Ireland,Europe,Europe
+IRL,Europe,Europe
+ISL,Europe,Europe
+ISR,Asia,Asia
+Israel,Asia,Asia
+ITA,Europe,Europe
+Italy,Europe,Europe
+Japan,Asia,Asia
+Jordan,Asia,Asia
+KAZ,Asia,Asia
+Kazakhstan,Asia,Asia
+Kenya,Africa,Africa
+KOR,Asia,Asia
+Laos,Asia,Asia
+LBR,Africa,Africa
+Lebanon,Asia,Asia
+LUX,Europe,Europe
+Madagascar,Africa,Africa
+Malaysia,Asia,Asia
+Maldives,Asia,Asia
+Mali,Africa,Africa
+Mauritius,Africa,Africa
+Mayotte,Africa,Africa
+MDG,Africa,Africa
+MDG_Makira,Traditionally-isolated,Africa
+Mexico,North America,North America
+Mozambique,Africa,Africa
+Nepal,Asia,Asia
+Netherlands,Europe,Europe
+New Caledonia,Oceania,Oceania
+New Zealand,Australia,Australia
+NLD,Europe,Europe
+NOR,Europe,Europe
+Norway,Europe,Europe
+Pakistan,Asia,Asia
+PER,South America,South America
+PER_Matses,Traditionally-isolated,South America
+Peru,South America,South America
+Philippines,Asia,Asia
+Poland,Europe,Europe
+Portugal,Europe,Europe
+Reunion,Africa,Africa
+RUS,Europe,Europe
+Russia,Europe,Europe
+Scotland,Europe,Europe
+Singapore,Asia,Asia
+Slovenia,Europe,Europe
+SLV,North America,North America
+South Africa,Africa,Africa
+South Korea,Asia,Asia
+Spain,Europe,Europe
+Sri Lanka,Asia,Asia
+SVK,Europe,Europe
+SWE,Europe,Europe
+Sweden,Europe,Europe
+Switzerland,Europe,Europe
+Taiwan,Asia,Asia
+Tanzania_Endesh_Datoga,Africa,Africa
+Tanzania_Singere_Hadza,Traditionally-isolated,Africa
+Thailand,Asia,Asia
+Turkmenistan,Asia,Asia
+TZA,Africa,Africa
+TZA_Hadza,Traditionally-isolated,Africa
+Uganda,Africa,Africa
+Ukraine,Europe,Europe
+United Kingdom,Europe,Europe
+United Republic of Tanzania,Africa,Africa
+United States,North America,North America
+USA,North America,North America
+USA_LameDeer_NorthernCheyenne,North America,North America
+Uzbekistan,Asia,Asia
+Vietnam,Asia,Asia
+Zambia,Africa,Africa
+Zimbabwe,Africa,Africa
+NA,NA,NA
