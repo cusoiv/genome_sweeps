@@ -12,6 +12,7 @@
 **05_ecological_associations** contains the code to associate GWSSs and SGBs to the 5 host conditions of interest (Figure 4a,b, Extended Data Fig. 7, 8).
 
 **06_functional_enrichments** contains the code to find functional enrichments in genes that are unique to or are under positive selection in GWSSs (Figure 4c, Extended Data Fig. 9).
+
 **Input data** for Figures 1-5 can be found at https://www.dropbox.com/scl/fo/lk7gh5zyqw9s60p6pgpuv/AJZdsFIWOs8eVaohConvTC0?rlkey=hfwfxi9y4ws6rkddrdlkfz5p1&st=r8yj1bjp&dl=0
 
 
