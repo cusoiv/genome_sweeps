@@ -71,7 +71,7 @@ all_sweep_info_total_list_sweep_SGB_overlap=lapply(all_sweep_info_total_list_swe
 
 
 ```{r add taxa and classfication}
-taxa_list=read.table("../fastANI_clust.average.diffH.94s.fgspecies.txt",
+taxa_list=read.table("fastANI_clust.average.diffH.94s.fgspecies.txt",
                      sep='\t',header=T)
 taxa_list_summary=taxa_list %>% group_by(cluster) %>% count(fgspecies) %>% slice(which.max(n))
 taxa_list_summary$species=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',3)
@@ -97,7 +97,7 @@ all_sweep_info_total_list_sweep_new$scaffold=gsub('_consensus','',
 all_sweep_info_total_list_sweep_new=merge(all_sweep_info_total_list_sweep_new,
                                           taxa_list_summary,by.x='SGB', 
                                           by.y = 'cluster')
-SGB_class=read.csv('../SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
+SGB_class=read.csv('SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
 all_sweep_info_total_list_sweep_new=all_sweep_info_total_list_sweep_new %>% 
   mutate(class=case_when(cluster_taxa %in% SGB_class$pathogen ~ 'pathogens',
                          cluster_taxa %in% SGB_class$probiotics ~ 'probiotics',
@@ -105,8 +105,8 @@ all_sweep_info_total_list_sweep_new=all_sweep_info_total_list_sweep_new %>%
 all_sweep_info_total_list_sweep_new$taxa=paste0(all_sweep_info_total_list_sweep_new$taxa,
                                                 "_",all_sweep_info_total_list_sweep_new$scaffold)
 all_sweep_info_total_list_sweep_new$family=sapply(strsplit(all_sweep_info_total_list_sweep_new$fgspecies,split = ';'),'[[',1)
-metadata_isolate=read.csv('../UHGG_plus4_metadata.csv') %>% select(Strain,Country)
-metadata_MG=read.csv('../metagenome_strainphlan_metadata_s2000.csv') %>% select(sample_id,country)
+metadata_isolate=read.csv('UHGG_plus4_metadata.csv') %>% select(Strain,Country)
+metadata_MG=read.csv('metagenome_strainphlan_metadata_s2000.csv') %>% select(sample_id,country)
 names(metadata_MG)=c("Strain","Country")
 metadata_all=rbind(metadata_isolate,metadata_MG)
 all_sweep_info_total_list_sweep_new=merge(all_sweep_info_total_list_sweep_new,metadata_all,by.x="sample",by.y="Strain")
@@ -137,7 +137,7 @@ names(all_countries)='Country'
 
 ```{r get extra continent column}
 
-country_to_continent=read.csv('../country_to_continent.csv',header = T)
+country_to_continent=read.csv('country_to_continent.csv',header = T)
 all_sweep_info_total_list_sweep_new=left_join(all_sweep_info_total_list_sweep_new,country_to_continent,by='Country')
 all_sweep_info_total_list_sweep_new$taxa=gsub('diffH','',all_sweep_info_total_list_sweep_new$taxa)
 all_sweep_info_total_list_sweep_new$Continent[is.na(all_sweep_info_total_list_sweep_new$Continent)]='Unknown'
