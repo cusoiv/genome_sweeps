@@ -20,7 +20,7 @@ lb_list_names=sapply(strsplit(lb_list,split = 'diffH'),function(x) x[1])
 lbfile_list=lapply(lb_list, function(x) read.table(x,sep='\t',header = T))
 lbfile_list=mapply(function(x,y) {x$cluster=y;x},lbfile_list,lb_list_names,SIMPLIFY=F)
 
-taxa_list=read.table("../fastANI_clust.average.diffH.94s.fgspecies.txt",
+taxa_list=read.table("fastANI_clust.average.diffH.94s.fgspecies.txt",
                      sep='\t',header=T)
 taxa_list_summary=taxa_list %>% group_by(cluster) %>% count(fgspecies) %>% slice(which.max(n))
 lbfile_list_summary=bind_rows(lbfile_list)
@@ -63,8 +63,8 @@ lbfile_list_summary_n20_filter = lbfile_list_summary_n20_filter %>% group_by(clu
 lbfile_list_summary_n20_filter$div=lbfile_list_summary_n20_filter$div*lbfile_list_summary_n20_filter$Alignment.size.iter1*(100-lbfile_list_summary_n20_filter$totalR)/100
 lbfile_list_summary_n20_filter$totalR=lbfile_list_summary_n20_filter$totalR/100
 #filter list for all taxa with no sweeps
-sweep_taxa=read.csv('../instrain/confirmed_sweep_from_pairwise.csv')
-taxa_class=read.csv('../SGB_classify_list.csv')
+sweep_taxa=read.csv('confirmed_sweep_from_pairwise.csv')
+taxa_class=read.csv('SGB_classify_list.csv')
 
 lbfile_list_summary_n20_filter_1=lbfile_list_summary_n20_filter %>% 
   filter(!cluster %in% sweep_taxa$SGB)
@@ -574,4 +574,4 @@ taxa_list_probiotics_df=data.frame(taxa=taxa_list_probiotics,type='probiotics')
 taxa_list_all_export=bind_rows(taxa_list_commensals_df,taxa_list_pathogens_df,taxa_list_probiotics_df)
 taxa_list_all_export$taxa=gsub('s__','',taxa_list_all_export$taxa)
 taxa_list_all_export$taxa=gsub('_',' ',taxa_list_all_export$taxa)
-write.csv(taxa_list_all_export,'../taxa_list_all_export.csv',row.names = F)
+write.csv(taxa_list_all_export,'taxa_list_all_export.csv',row.names = F)
