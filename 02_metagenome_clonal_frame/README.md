@@ -6,4 +6,4 @@
 
 **03_run_instrain_cf_compare.sh** confirms all the metagenome-isolate sweeps with pairwise distances 
 
-**04_db_analysis_part2.Rmd** is the figure generating file for Figure 1, and Extended Figures 4 and 5.
+**04_db_analysis_part2.Rmd** is the figure generating file for Figure 1, and Extended Figures 4 and 5, the corresponding input files for this analysis is at https://www.dropbox.com/scl/fo/0p45rfa0a5678lza3y5qb/AGO0t5rQZvmLP7g8HKM-xAc?rlkey=y1im76qt19h2lplebiuln1jnd&st=c5qpmrqj&dl=0
