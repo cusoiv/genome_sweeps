@@ -97,7 +97,7 @@ all_sweep_info_total_list_sweep_new$scaffold=gsub('_consensus','',
 all_sweep_info_total_list_sweep_new=merge(all_sweep_info_total_list_sweep_new,
                                           taxa_list_summary,by.x='SGB', 
                                           by.y = 'cluster')
-SGB_class=read.csv('SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
+SGB_class=read.csv('SGB_classify_list_sweepy.csv')
 all_sweep_info_total_list_sweep_new=all_sweep_info_total_list_sweep_new %>% 
   mutate(class=case_when(cluster_taxa %in% SGB_class$pathogen ~ 'pathogens',
                          cluster_taxa %in% SGB_class$probiotics ~ 'probiotics',
