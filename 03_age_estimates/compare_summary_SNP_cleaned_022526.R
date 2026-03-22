@@ -17,11 +17,11 @@ compare_UKtwins_list=list()
 compare_longt_list=list()
 select_total_list=list()
 
-metadata_isolate=read.csv('../UHGG_plus4_metadata.csv') %>% select(Strain,Country)
-metadata_MG=read.csv('../metagenome_strainphlan_metadata_s2000.csv') %>% select(sample_id,country)
+metadata_isolate=read.csv('UHGG_plus4_metadata.csv') %>% select(Strain,Country)
+metadata_MG=read.csv('metagenome_strainphlan_metadata_s2000.csv') %>% select(sample_id,country)
 names(metadata_MG)=c("Strain","Country")
 metadata_all=rbind(metadata_isolate,metadata_MG)
-country_to_continent=read.csv('../country_to_continent.csv',header = T)
+country_to_continent=read.csv('country_to_continent.csv',header = T)
 
 
 for (i in 1:nrow(sweep_list)){
@@ -141,7 +141,7 @@ for (i in 1:nrow(sweep_list)){
   }
 }
 
-taxa_list=read.table("../fastANI_clust.average.diffH.94s.fgspecies.txt",
+taxa_list=read.table("fastANI_clust.average.diffH.94s.fgspecies.txt",
                      sep='\t',header=T)
 taxa_list_summary=taxa_list %>% group_by(cluster) %>% count(fgspecies) %>% slice(which.max(n))
 taxa_list_summary$species=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',3)
@@ -179,7 +179,7 @@ compare_summary_info$genome=gsub('.fasta','',compare_summary_info$genome)
 compare_summary_info_s=merge(compare_summary_info,compare_summary_5s_s,by.x='genome',by.y='scaffold')
 
 compare_summary_5s=read.csv('confirmed_sweep_from_pairwise.csv')
-SGB_class=read.csv('../SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
+SGB_class=read.csv('SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
 
 SGB_class_pathogen=sapply(strsplit(SGB_class$pathogen,split = '_'),'[[',5)
 SGB_class_probiotics=sapply(strsplit(SGB_class$probiotics[1:11],split = '_'),'[[',5)
