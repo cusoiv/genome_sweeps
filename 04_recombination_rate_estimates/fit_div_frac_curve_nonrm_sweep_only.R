@@ -18,7 +18,7 @@ lb_list_names=sapply(strsplit(lb_list,split = 'diffH'),function(x) x[1])
 lbfile_list=lapply(lb_list, function(x) read.table(x,sep='\t',header = T))
 lbfile_list=mapply(function(x,y) {x$cluster=y;x},lbfile_list,lb_list_names,SIMPLIFY=F)
 
-taxa_list=read.table("../fastANI_clust.average.diffH.94s.fgspecies.txt",
+taxa_list=read.table("fastANI_clust.average.diffH.94s.fgspecies.txt",
                      sep='\t',header=T)
 taxa_list_summary=taxa_list %>% group_by(cluster) %>% count(fgspecies) %>% slice(which.max(n))
 lbfile_list_summary=bind_rows(lbfile_list)
@@ -60,7 +60,7 @@ lbfile_list_summary_n20_filter = lbfile_list_summary_n20_filter %>% group_by(clu
 lbfile_list_summary_n20_filter$div=lbfile_list_summary_n20_filter$div*lbfile_list_summary_n20_filter$Alignment.size.iter1*(100-lbfile_list_summary_n20_filter$totalR)/100
 lbfile_list_summary_n20_filter$totalR=lbfile_list_summary_n20_filter$totalR/100
 #filter list for all taxa with sweeps
-sweep_taxa=read.csv('../instrain/confirmed_sweep_from_pairwise.csv')
+sweep_taxa=read.csv('confirmed_sweep_from_pairwise.csv')
 lbfile_list_summary_n20_filter=lbfile_list_summary_n20_filter %>% 
   filter(cluster %in% sweep_taxa$SGB)
 lbfile_list_summary_n20_filter_list=split(lbfile_list_summary_n20_filter,f=lbfile_list_summary_n20_filter$cluster_taxa)
@@ -320,7 +320,7 @@ r2_list=r2_list[!(r2_list %in% badfit_lists)]
 
 
 #read in taxa classification
-taxa_class=read.csv('../instrain/taxa_class_all.csv')
+taxa_class=read.csv('instrain/taxa_class_all.csv')
 taxa_class_include=c(taxa_class$commensals)
 
 
@@ -451,7 +451,7 @@ for (j in 1:65){
 dev.off()
 
 
-all_sweep_info_total_list_SGB_summary=read.csv('../instrain/all_sweep_info_total_list_SGB_summary.csv',header = T)
+all_sweep_info_total_list_SGB_summary=read.csv('all_sweep_info_total_list_SGB_summary.csv',header = T)
 
 seg_slope_all_new=bind_rows(seg_slope_list) 
 write.csv(seg_slope_all,'seg_slope_all_nonrm.csv',row.names = F)
