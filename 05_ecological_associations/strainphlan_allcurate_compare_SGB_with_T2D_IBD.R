@@ -16,7 +16,7 @@ library(forcats)
 
 setwd("C:/Users/Xiaoqian/Desktop/pop_gen/UHGG_plus4/strainphlan/allcurated_with_IBD_T2D_meta4_beta1_vJan21/")
 
-taxa_list=read.table("../../fastANI_clust.average.diffH.94s.fgspecies.txt",
+taxa_list=read.table("fastANI_clust.average.diffH.94s.fgspecies.txt",
                      sep='\t',header=T)
 taxa_list_summary=taxa_list %>% group_by(cluster) %>% count(fgspecies) %>% slice_max(order_by=n,with_ties = F)
 taxa_list_summary$species=sapply(strsplit(taxa_list_summary$fgspecies,split = ';'),'[[',3)
@@ -47,7 +47,7 @@ for (i in 1: length(SGB_exist_list)){
   }
 }
 
-MG_metadata=read.csv("../../metagenome_strainphlan_metadata.csv")
+MG_metadata=read.csv("metagenome_strainphlan_metadata.csv")
 SGBstrain_list=Filter(Negate(is.null), SGBstrain_list)
 SGBstrain_list_merge=bind_rows(SGBstrain_list)
 SGBstrain_list=Filter(function(x) nrow(x) > 1, SGBstrain_list)
@@ -120,7 +120,7 @@ SGBstrain_merged_list_4=lapply(SGBstrain_merged_list_4,function(x)
 
 
 #only select for commensal SGBs
-SGB_class=read.csv('../../SGBdiffH_500_1pois_1nb_finda/SGB_classify_list_sweepy.csv')
+SGB_class=read.csv('SGB_classify_list_sweepy.csv')
 commensal_select=names(SGBstrain_merged_list_1)[!(names(SGBstrain_merged_list_1) %in% c(SGB_class$pathogen,SGB_class$probiotics))]
 
 #filter for commensals
