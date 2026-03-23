@@ -5,3 +5,4 @@
 2) the metagenome-based molecular clocks generated from the UKtwins_analysis.R and longt_analysis.R.
 
 Together, these form the basis for all the sweep age estimates in Figure 2.
+The input files for these code can be found at https://www.dropbox.com/scl/fo/b9rx3x5w3qzstu2g0nrxh/AJ2M1zYTicFCGu8zyDjts0A?rlkey=kayivv4vdkwwaazyz0ang4ik1&st=xdd6dqx3&dl=0
